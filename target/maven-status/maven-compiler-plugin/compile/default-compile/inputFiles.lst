@@ -1,0 +1,15 @@
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/RagController.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/service/LlmService.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/config/LangChain4jConfig.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/service/Assistant.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/tool/MockWeatherTool.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/DocumentLoader.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/LangChain4jApplication.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/RagService.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/TextSplitter.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/controller/AiController.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/service/AssistantWithMemory.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/InMemoryEmbeddingStore.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/service/CustomerServiceAssistant.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/rag/Document.java
+/Users/wanshun/Documents/Code/langchain4j-learning/src/main/java/com/example/ai/tool/CalculatorTool.java
