@@ -14,9 +14,9 @@ public class InMemoryEmbeddingStore {
     private final List<EmbeddedChunk> chunks = new ArrayList<>();
     private final Map<String, float[]> fakeVectorCache = new HashMap<>();
 
-    public String add(Embedding embedding, TextSegment text) {
+    public String add(Embedding embedding, String text) {
         String id = "chunk_" + System.nanoTime();
-        chunks.add(new EmbeddedChunk(id, embedding, text));
+        chunks.add(new EmbeddedChunk(id, embedding, TextSegment.from(text)));
         return id;
     }
 
@@ -82,6 +82,10 @@ public class InMemoryEmbeddingStore {
             this.id = id;
             this.embedding = embedding;
             this.segment = segment;
+        }
+
+        public String getText() {
+            return segment.text();
         }
     }
 

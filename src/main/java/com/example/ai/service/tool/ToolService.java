@@ -1,29 +1,40 @@
-package com.example.ai.tool;
+package com.example.ai.service.tool;
 
 import dev.langchain4j.agent.tool.Tool;
-import org.springframework.stereotype.Component;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
 
-@Component
-public class CalculatorTool {
+@Slf4j
+@Service
+public class ToolService {
 
-    @Tool("Calculate a mathematical expression")
+    @Tool("Calculate mathematical expression")
     public double calculate(String expression) {
-        // Remove all whitespace
+        log.info("Calculating: {}", expression);
         expression = expression.replaceAll("\\s+", "");
-
-        // Only allow safe characters for calculation
         if (!expression.matches("[0-9+\\-*/().]+")) {
             throw new IllegalArgumentException("Invalid expression: " + expression);
         }
-
         return evaluateExpression(expression);
+    }
+
+    @Tool("Query weather information")
+    public String queryWeather(String city) {
+        log.info("Querying weather for: {}", city);
+        return switch (city.toLowerCase()) {
+            case "beijing" -> "Beijing: 22°C, Sunny, AQI: 78";
+            case "shanghai" -> "Shanghai: 25°C, Cloudy, AQI: 55";
+            case "guangzhou" -> "Guangzhou: 28°C, Rainy, AQI: 40";
+            case "shenzhen" -> "Shenzhen: 27°C, Partly Cloudy, AQI: 35";
+            case "hangzhou" -> "Hangzhou: 24°C, Sunny, AQI: 62";
+            default -> "Weather data not available for " + city;
+        };
     }
 
     private double evaluateExpression(String expression) {
         return new ExpressionEvaluator(expression).evaluate();
     }
 
-    // Simple recursive descent parser for basic arithmetic
     private static class ExpressionEvaluator {
         private final String expr;
         private int pos = 0;
