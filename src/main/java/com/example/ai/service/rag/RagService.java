@@ -34,15 +34,23 @@ public class RagService {
     }
 
     public String query(RagRequest request) {
-        List<EmbeddedChunk> relevantChunks =
-                embeddingStore.findRelevant(request.getQuestion(), request.getTopK());
+        int totalChunks = embeddingStore.size();
+        int topK = calculateDynamicTopK(totalChunks, request.getTopK());
+
+        List<EmbeddedChunk> relevantChunks = embeddingStore.findRelevant(request.getQuestion(), topK);
 
         StringBuilder context = new StringBuilder();
         if (relevantChunks != null) {
-            for (int i = 0; i < relevantChunks.size(); i++) {
-                context.append("[").append(i + 1).append("] ")
-                       .append(relevantChunks.get(i).segment.text())
-                       .append("\n\n");
+            // 去重 + 过滤短chunk + 重新编号
+            var seen = new java.util.HashSet<String>();
+            int index = 1;
+            for (EmbeddedChunk chunk : relevantChunks) {
+                String text = chunk.segment.text();
+                if (text.length() < 50) continue;
+                if (seen.contains(text)) continue;
+                seen.add(text);
+                context.append("[").append(index).append("] ").append(text).append("\n\n");
+                index++;
             }
         }
 
@@ -65,6 +73,9 @@ public class RagService {
                 2. **如果资料中没有相关信息，直接回答"资料中没有提供相关信息"**，不要推测
                 3. **用中文回答**
                 4. **分点输出**，使用编号列表，每个要点单独一行
+                5. **冲突处理**：如果多个chunk内容冲突，以编号最小的（最相关）为准
+                6. **严格引用**：每个[编号]必须对应当前context中的chunk顺序，不允许跨chunk混用引用
+                7. **无把握不引用**：如果无法确认信息来源，禁止随意引用编号
 
                 ## 参考资料
 
@@ -76,7 +87,7 @@ public class RagService {
 
                 ## 回答格式
 
-                在回答每个要点时，在句末用 [编号] 标注信息来源。例如：[1][3]
+                在回答每个要点时，在句末用[编号]标注信息来源。例如：[1][3]
 
                 如果某个要点来自多个来源，请标注所有相关编号：[1][2]
                 """.formatted(context, question);
@@ -88,6 +99,19 @@ public class RagService {
 
     public int getDocumentCount() {
         return embeddingStore.size();
+    }
+
+    private int calculateDynamicTopK(int totalChunks, int requestedTopK) {
+        if (totalChunks <= 0) {
+            return Math.max(2, requestedTopK);
+        }
+        if (totalChunks < 3) {
+            return totalChunks;
+        }
+        if (totalChunks <= 10) {
+            return Math.min(3 + (totalChunks - 3) / 2, 5);
+        }
+        return 5;
     }
 
     public interface RagAssistant {

@@ -1,17 +1,29 @@
 package com.example.ai.infrastructure.embedding;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.embedding.Embedding;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class InMemoryEmbeddingStore implements EmbeddingStore {
 
+    private static final String OLLAMA_URL = "http://localhost:11434/api/embeddings";
+    private static final String MODEL = "nomic-embed-text";
+    private final OkHttpClient client = new OkHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
     private final List<EmbeddedChunk> chunks = new ArrayList<>();
-    private final Map<String, float[]> fakeVectorCache = new HashMap<>();
+    private final Map<String, float[]> cache = new ConcurrentHashMap<>();
 
     @Override
     public String add(Embedding embedding, String text) {
@@ -22,37 +34,59 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
 
     @Override
     public List<EmbeddedChunk> findRelevant(String text, int topK) {
-        Embedding queryEmbedding = createEmbedding(text);
-        return findRelevantChunks(queryEmbedding, topK);
+        return findRelevant(text, topK, 0.65);
     }
 
-    public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults) {
+    public List<EmbeddedChunk> findRelevant(String text, int topK, double threshold) {
+        Embedding queryEmbedding = createEmbedding(text);
+        return findRelevantChunks(queryEmbedding, topK, threshold);
+    }
+
+    public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults, double threshold) {
         return chunks.stream()
                 .map(chunk -> new ScoredChunk(chunk, cosineSimilarity(queryEmbedding, chunk.embedding)))
+                .filter(sc -> sc.getScore() >= threshold)
                 .sorted(Comparator.comparingDouble(ScoredChunk::getScore).reversed())
                 .limit(maxResults)
                 .map(ScoredChunk::getChunk)
                 .toList();
     }
 
-    public float[] createSimpleEmbedding(String text) {
-        if (fakeVectorCache.containsKey(text)) {
-            return fakeVectorCache.get(text);
+    private float[] fetchEmbedding(String text) {
+        try {
+            Map<String, String> requestBody = Map.of("model", MODEL, "prompt", text);
+            String json = objectMapper.writeValueAsString(requestBody);
+            RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+            Request request = new Request.Builder()
+                    .url(OLLAMA_URL)
+                    .post(body)
+                    .build();
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new RuntimeException("Ollama API error: " + response.code() + " - " + response.body().string());
+                }
+                String responseBody = response.body().string();
+                JsonNode root = objectMapper.readTree(responseBody);
+                JsonNode embeddingNode = root.get("embedding");
+                if (embeddingNode == null) {
+                    throw new RuntimeException("No 'embedding' in Ollama response: " + responseBody);
+                }
+                float[] result = new float[embeddingNode.size()];
+                for (int i = 0; i < result.length; i++) {
+                    result[i] = (float) embeddingNode.get(i).asDouble();
+                }
+                return result;
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch embedding from Ollama", e);
         }
-        float[] vector = new float[1536];
-        for (int i = 0; i < text.length() && i < 1536; i++) {
-            vector[i] = (float) text.charAt(i) / 255.0f;
-        }
-        for (int i = text.length(); i < 1536; i++) {
-            vector[i] = 0.1f;
-        }
-        fakeVectorCache.put(text, vector);
-        return vector;
     }
 
     @Override
     public Embedding createEmbedding(String text) {
-        return new Embedding(createSimpleEmbedding(text));
+        return new Embedding(cache.computeIfAbsent(text, this::fetchEmbedding));
     }
 
     private double cosineSimilarity(Embedding a, Embedding b) {
@@ -72,7 +106,7 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
     @Override
     public void clear() {
         chunks.clear();
-        fakeVectorCache.clear();
+        cache.clear();
     }
 
     @Override

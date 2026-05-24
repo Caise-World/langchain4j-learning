@@ -9,6 +9,6 @@ public class AppConfig {
 
     @Bean
     public TextSplitter textSplitter() {
-        return new TextSplitter(500, 50);
+        return new TextSplitter();
     }
 }
