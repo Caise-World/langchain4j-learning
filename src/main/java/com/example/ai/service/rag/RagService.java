@@ -39,8 +39,10 @@ public class RagService {
 
         StringBuilder context = new StringBuilder();
         if (relevantChunks != null) {
-            for (EmbeddedChunk chunk : relevantChunks) {
-                context.append(chunk.segment.text()).append("\n\n");
+            for (int i = 0; i < relevantChunks.size(); i++) {
+                context.append("[").append(i + 1).append("] ")
+                       .append(relevantChunks.get(i).segment.text())
+                       .append("\n\n");
             }
         }
 
@@ -55,14 +57,28 @@ public class RagService {
 
     private String buildPrompt(String question, String context) {
         return """
-                你是一个知识库问答助手。请根据以下参考资料回答用户的问题。
+                你是一个知识库问答助手，任务是基于提供的参考资料回答用户问题。
 
-                参考资料：
+                ## 回答要求
+
+                1. **必须基于参考资料回答**，不得编造不在资料中的信息
+                2. **如果资料中没有相关信息，直接回答"资料中没有提供相关信息"**，不要推测
+                3. **用中文回答**
+                4. **分点输出**，使用编号列表，每个要点单独一行
+
+                ## 参考资料
+
                 %s
 
-                用户问题：%s
+                ## 用户问题
 
-                请基于参考资料回答，如果参考资料中没有相关信息，请如实说明。
+                %s
+
+                ## 回答格式
+
+                在回答每个要点时，在句末用 [编号] 标注信息来源。例如：[1][3]
+
+                如果某个要点来自多个来源，请标注所有相关编号：[1][2]
                 """.formatted(context, question);
     }
 
