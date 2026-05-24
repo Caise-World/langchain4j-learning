@@ -43,11 +43,11 @@ public class RagService {
         int totalChunks = embeddingStore.size();
         int topK = calculateDynamicTopK(totalChunks, request.getTopK());
 
-        // 多 query 分别检索，合并结果
+        // 多 query 分别检索，合并候选（扩大初筛范围用于 rerank）
         Set<String> seenTexts = new HashSet<>();
         List<EmbeddedChunk> mergedChunks = new ArrayList<>();
         for (String q : queries) {
-            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK);
+            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK * 3);  // 初筛扩大
             if (chunks != null) {
                 for (EmbeddedChunk chunk : chunks) {
                     String text = chunk.segment.text();
@@ -59,9 +59,12 @@ public class RagService {
             }
         }
 
+        // rerank 排序
+        List<EmbeddedChunk> rerankedChunks = rerankAndFilter(originalQuestion, mergedChunks, topK);
+
         StringBuilder context = new StringBuilder();
         int index = 1;
-        for (EmbeddedChunk chunk : mergedChunks) {
+        for (EmbeddedChunk chunk : rerankedChunks) {
             String text = chunk.segment.text();
             if (text.length() < 50) continue;
             context.append("[").append(index).append("] ").append(text).append("\n\n");
@@ -76,6 +79,58 @@ public class RagService {
 
         return assistant.chat(prompt);
     }
+
+    private List<EmbeddedChunk> rerankAndFilter(String question, List<EmbeddedChunk> candidates, int topK) {
+        if (candidates.isEmpty()) {
+            return candidates;
+        }
+
+        // 构建 rerank prompt
+        StringBuilder sb = new StringBuilder();
+        sb.append("你是一个相关性评分助手，请根据用户问题给每个候选文本打分（0-10）：\n\n");
+        sb.append("评分标准：\n");
+        sb.append("- 是否直接回答问题\n");
+        sb.append("- 是否包含关键信息\n");
+        sb.append("- 是否语义相关\n\n");
+        sb.append("输出格式：\n");
+        sb.append("[编号] 分数\n\n");
+        sb.append("用户问题：").append(question).append("\n\n");
+        sb.append("候选文本：\n");
+        for (int i = 0; i < candidates.size(); i++) {
+            sb.append("[").append(i + 1).append("] ").append(candidates.get(i).segment.text()).append("\n\n");
+        }
+
+        Reranker reranker = AiServices.builder(Reranker.class)
+                .chatLanguageModel(modelFactory.getDefaultModel())
+                .build();
+
+        String result = reranker.rerank(sb.toString());
+
+        // 解析分数并排序
+        List<ScoredChunk> scored = new ArrayList<>();
+        String[] lines = result.split("\n");
+        for (String line : lines) {
+            line = line.trim();
+            if (line.matches("\\[\\d+\\]\\s*\\d+")) {
+                String[] parts = line.split("\\]\\s*");
+                int idx = Integer.parseInt(parts[0].substring(1)) - 1;
+                double score = Double.parseDouble(parts[1]);
+                if (idx >= 0 && idx < candidates.size() && score >= 5) {
+                    scored.add(new ScoredChunk(candidates.get(idx), score));
+                }
+            }
+        }
+
+        // 按分数降序，取 topK
+        scored.sort((a, b) -> Double.compare(b.score, a.score));
+        List<EmbeddedChunk> resultChunks = new ArrayList<>();
+        for (int i = 0; i < Math.min(topK, scored.size()); i++) {
+            resultChunks.add(scored.get(i).chunk);
+        }
+        return resultChunks;
+    }
+
+    private record ScoredChunk(EmbeddedChunk chunk, double score) {}
 
     private List<String> generateMultipleQueries(String query) {
         String multiQueryPrompt = """
@@ -186,5 +241,9 @@ public class RagService {
 
     public interface QueryExpander {
         String expand(String prompt);
+    }
+
+    public interface Reranker {
+        String rerank(String prompt);
     }
 }
