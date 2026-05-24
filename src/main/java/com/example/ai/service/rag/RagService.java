@@ -9,7 +9,10 @@ import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -34,27 +37,38 @@ public class RagService {
     }
 
     public String query(RagRequest request) {
+        String originalQuestion = request.getQuestion();
+        List<String> queries = generateMultipleQueries(originalQuestion);
+
         int totalChunks = embeddingStore.size();
         int topK = calculateDynamicTopK(totalChunks, request.getTopK());
 
-        List<EmbeddedChunk> relevantChunks = embeddingStore.findRelevant(request.getQuestion(), topK);
-
-        StringBuilder context = new StringBuilder();
-        if (relevantChunks != null) {
-            // 去重 + 过滤短chunk + 重新编号
-            var seen = new java.util.HashSet<String>();
-            int index = 1;
-            for (EmbeddedChunk chunk : relevantChunks) {
-                String text = chunk.segment.text();
-                if (text.length() < 50) continue;
-                if (seen.contains(text)) continue;
-                seen.add(text);
-                context.append("[").append(index).append("] ").append(text).append("\n\n");
-                index++;
+        // 多 query 分别检索，合并结果
+        Set<String> seenTexts = new HashSet<>();
+        List<EmbeddedChunk> mergedChunks = new ArrayList<>();
+        for (String q : queries) {
+            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK);
+            if (chunks != null) {
+                for (EmbeddedChunk chunk : chunks) {
+                    String text = chunk.segment.text();
+                    if (!seenTexts.contains(text)) {
+                        seenTexts.add(text);
+                        mergedChunks.add(chunk);
+                    }
+                }
             }
         }
 
-        String prompt = buildPrompt(request.getQuestion(), context.toString());
+        StringBuilder context = new StringBuilder();
+        int index = 1;
+        for (EmbeddedChunk chunk : mergedChunks) {
+            String text = chunk.segment.text();
+            if (text.length() < 50) continue;
+            context.append("[").append(index).append("] ").append(text).append("\n\n");
+            index++;
+        }
+
+        String prompt = buildPrompt(originalQuestion, context.toString());
 
         RagAssistant assistant = AiServices.builder(RagAssistant.class)
                 .chatLanguageModel(modelFactory.getDefaultModel())
@@ -63,19 +77,67 @@ public class RagService {
         return assistant.chat(prompt);
     }
 
+    private List<String> generateMultipleQueries(String query) {
+        String multiQueryPrompt = """
+                你是检索优化助手，请基于用户问题生成3个不同的检索版本：
+                要求：
+                - 保留原意
+                - 从不同角度表达
+                - 包含关键词变体
+                - 输出3条，用换行分隔，不要解释
+
+                用户问题：%s
+                """.formatted(query);
+
+        QueryExpander expander = AiServices.builder(QueryExpander.class)
+                .chatLanguageModel(modelFactory.getDefaultModel())
+                .build();
+
+        String result = expander.expand(multiQueryPrompt);
+        List<String> queries = new ArrayList<>();
+        for (String line : result.split("\n")) {
+            String trimmed = line.trim();
+            if (!trimmed.isEmpty() && queries.size() < 3) {
+                queries.add(trimmed);
+            }
+        }
+        // 至少保含原始查询
+        if (queries.isEmpty()) {
+            queries.add(query);
+        }
+        return queries;
+    }
+
     private String buildPrompt(String question, String context) {
         return """
-                你是一个知识库问答助手，任务是基于提供的参考资料回答用户问题。
+                你是一个严格基于资料的知识库问答助手。
 
-                ## 回答要求
+                ## 核心原则
 
-                1. **必须基于参考资料回答**，不得编造不在资料中的信息
-                2. **如果资料中没有相关信息，直接回答"资料中没有提供相关信息"**，不要推测
-                3. **用中文回答**
-                4. **分点输出**，使用编号列表，每个要点单独一行
-                5. **冲突处理**：如果多个chunk内容冲突，以编号最小的（最相关）为准
-                6. **严格引用**：每个[编号]必须对应当前context中的chunk顺序，不允许跨chunk混用引用
-                7. **无把握不引用**：如果无法确认信息来源，禁止随意引用编号
+                1. **只使用提供的参考资料回答**，不得编造任何资料中不存在的信息
+                2. **禁止使用常识或推理补全资料中未提供的信息**
+                3. **如果资料不足以完整回答，必须明确回答"根据现有资料无法回答该问题"**
+                4. **用中文回答**
+
+                ## 结构化输出要求
+
+                回答必须包含以下三部分，缺一不可：
+
+                ### 一、答案
+                基于资料给出答案，每条结论必须标注[编号]
+
+                ### 二、引用来源
+                所有引用的编号必须对应当前context中的chunk顺序
+
+                ### 三、无匹配说明（若无相关资料）
+                如果资料中没有相关信息，回答："根据现有资料无法回答该问题"
+
+                ## 严格引用规则
+
+                - 每个结论必须有对应chunk编号
+                - 不允许无引用的结论
+                - 若无法引用 → 删除该结论
+                - 禁止跨chunk混用引用
 
                 ## 参考资料
 
@@ -87,9 +149,13 @@ public class RagService {
 
                 ## 回答格式
 
-                在回答每个要点时，在句末用[编号]标注信息来源。例如：[1][3]
+                答案：
+                1. [结论内容] [编号]
+                2. [结论内容] [编号]
 
-                如果某个要点来自多个来源，请标注所有相关编号：[1][2]
+                来源：[编号列表]
+
+                （如果无相关资料，直接输出：根據現有資料無法回答該問題）
                 """.formatted(context, question);
     }
 
@@ -116,5 +182,9 @@ public class RagService {
 
     public interface RagAssistant {
         String chat(String message);
+    }
+
+    public interface QueryExpander {
+        String expand(String prompt);
     }
 }

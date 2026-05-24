@@ -34,7 +34,7 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
 
     @Override
     public List<EmbeddedChunk> findRelevant(String text, int topK) {
-        return findRelevant(text, topK, 0.65);
+        return findRelevant(text, topK, 0.6);
     }
 
     public List<EmbeddedChunk> findRelevant(String text, int topK, double threshold) {
