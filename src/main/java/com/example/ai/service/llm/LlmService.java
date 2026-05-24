@@ -9,6 +9,7 @@ import dev.langchain4j.model.chat.ChatLanguageModel;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
 @RequiredArgsConstructor
@@ -41,6 +42,32 @@ public class LlmService {
                 .modelType(modelType.name())
                 .timestamp(java.time.LocalDateTime.now().toString())
                 .build();
+    }
+
+    public void streamChat(String message, String sessionId, String modelType, SseEmitter emitter) {
+        ModelType type = parseModelType(modelType);
+        ChatLanguageModel model = modelFactory.getModel(type);
+
+        Assistant assistant = AiServices.builder(Assistant.class)
+                .chatLanguageModel(model)
+                .build();
+
+        String fullResponse = assistant.chat(message);
+
+        // 模拟流式输出，逐字发送
+        try {
+            for (char c : fullResponse.toCharArray()) {
+                emitter.send(SseEmitter.event()
+                        .name("message")
+                        .data(String.valueOf(c)));
+                Thread.sleep(30);  // 模拟延迟，实际生产环境去掉
+            }
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+            return;
+        }
+
+        emitter.complete();
     }
 
     private String chatWithMemory(ChatRequest request, ChatLanguageModel model, Assistant assistant) {

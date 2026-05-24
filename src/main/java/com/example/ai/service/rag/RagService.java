@@ -1,5 +1,7 @@
 package com.example.ai.service.rag;
 
+import com.example.ai.infrastructure.embedding.EmbeddingStore;
+import com.example.ai.infrastructure.embedding.EmbeddedChunk;
 import com.example.ai.model.dto.RagRequest;
 import com.example.ai.rag.*;
 import com.example.ai.service.llm.ModelFactory;
@@ -15,7 +17,7 @@ public class RagService {
 
     private final ModelFactory modelFactory;
     private final TextSplitter textSplitter;
-    private final InMemoryEmbeddingStore embeddingStore;
+    private final EmbeddingStore embeddingStore;
 
     public int ingestDocument(String filePath) throws Exception {
         DocumentLoader loader = new DocumentLoader();
@@ -23,9 +25,8 @@ public class RagService {
         List<TextSplitter.TextChunk> chunks = textSplitter.split(doc.getContent(), doc.getId());
 
         for (TextSplitter.TextChunk chunk : chunks) {
-            float[] vector = embeddingStore.createSimpleEmbedding(chunk.getContent());
             dev.langchain4j.data.embedding.Embedding embedding =
-                    new dev.langchain4j.data.embedding.Embedding(vector);
+                    embeddingStore.createEmbedding(chunk.getContent());
             embeddingStore.add(embedding, chunk.getContent());
         }
 
@@ -33,17 +34,13 @@ public class RagService {
     }
 
     public String query(RagRequest request) {
-        float[] questionVector = embeddingStore.createSimpleEmbedding(request.getQuestion());
-        dev.langchain4j.data.embedding.Embedding questionEmbedding =
-                new dev.langchain4j.data.embedding.Embedding(questionVector);
-
-        List<InMemoryEmbeddingStore.EmbeddedChunk> relevantChunks =
-                embeddingStore.findRelevantChunks(questionEmbedding, request.getTopK());
+        List<EmbeddedChunk> relevantChunks =
+                embeddingStore.findRelevant(request.getQuestion(), request.getTopK());
 
         StringBuilder context = new StringBuilder();
         if (relevantChunks != null) {
-            for (int i = 0; i < relevantChunks.size(); i++) {
-                context.append(relevantChunks.get(i).segment.text()).append("\n\n");
+            for (EmbeddedChunk chunk : relevantChunks) {
+                context.append(chunk.segment.text()).append("\n\n");
             }
         }
 

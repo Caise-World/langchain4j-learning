@@ -1,7 +1,6 @@
-package com.example.ai.rag;
+package com.example.ai.infrastructure.embedding;
 
 import dev.langchain4j.data.embedding.Embedding;
-import dev.langchain4j.data.segment.TextSegment;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -9,21 +8,22 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class InMemoryEmbeddingStore {
+public class InMemoryEmbeddingStore implements EmbeddingStore {
 
     private final List<EmbeddedChunk> chunks = new ArrayList<>();
     private final Map<String, float[]> fakeVectorCache = new HashMap<>();
 
+    @Override
     public String add(Embedding embedding, String text) {
         String id = "chunk_" + System.nanoTime();
-        chunks.add(new EmbeddedChunk(id, embedding, TextSegment.from(text)));
+        chunks.add(new EmbeddedChunk(id, embedding, dev.langchain4j.data.segment.TextSegment.from(text)));
         return id;
     }
 
-    public List<String> search(Embedding queryEmbedding, int maxResults) {
-        return findRelevantChunks(queryEmbedding, maxResults).stream()
-                .map(c -> c.segment.text())
-                .toList();
+    @Override
+    public List<EmbeddedChunk> findRelevant(String text, int topK) {
+        Embedding queryEmbedding = createEmbedding(text);
+        return findRelevantChunks(queryEmbedding, topK);
     }
 
     public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults) {
@@ -33,20 +33,6 @@ public class InMemoryEmbeddingStore {
                 .limit(maxResults)
                 .map(ScoredChunk::getChunk)
                 .toList();
-    }
-
-    private double cosineSimilarity(Embedding a, Embedding b) {
-        float[] vecA = a.vector();
-        float[] vecB = b.vector();
-        double dotProduct = 0;
-        double normA = 0;
-        double normB = 0;
-        for (int i = 0; i < vecA.length && i < vecB.length; i++) {
-            dotProduct += vecA[i] * vecB[i];
-            normA += vecA[i] * vecA[i];
-            normB += vecB[i] * vecB[i];
-        }
-        return normA > 0 && normB > 0 ? dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
     }
 
     public float[] createSimpleEmbedding(String text) {
@@ -64,29 +50,34 @@ public class InMemoryEmbeddingStore {
         return vector;
     }
 
+    @Override
+    public Embedding createEmbedding(String text) {
+        return new Embedding(createSimpleEmbedding(text));
+    }
+
+    private double cosineSimilarity(Embedding a, Embedding b) {
+        float[] vecA = a.vector();
+        float[] vecB = b.vector();
+        double dotProduct = 0;
+        double normA = 0;
+        double normB = 0;
+        for (int i = 0; i < vecA.length && i < vecB.length; i++) {
+            dotProduct += vecA[i] * vecB[i];
+            normA += vecA[i] * vecA[i];
+            normB += vecB[i] * vecB[i];
+        }
+        return normA > 0 && normB > 0 ? dotProduct / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
+    }
+
+    @Override
     public void clear() {
         chunks.clear();
         fakeVectorCache.clear();
     }
 
+    @Override
     public int size() {
         return chunks.size();
-    }
-
-    public static class EmbeddedChunk {
-        public final String id;
-        public final Embedding embedding;
-        public final TextSegment segment;
-
-        public EmbeddedChunk(String id, Embedding embedding, TextSegment segment) {
-            this.id = id;
-            this.embedding = embedding;
-            this.segment = segment;
-        }
-
-        public String getText() {
-            return segment.text();
-        }
     }
 
     private static class ScoredChunk {

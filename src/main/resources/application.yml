@@ -4,7 +4,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/ai_service?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
     username: root
-    password: ${DB_PASSWORD}
+    password: ${DB_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
@@ -22,7 +22,14 @@ spring:
   profiles:
     active: local
 
-# AI Models Configuration
+server:
+  port: 8081
+
+logging:
+  level:
+    com.example.ai: DEBUG
+
+# AI Models Configuration (共享配置，所有 profile 都用这个)
 ai-models:
   minimax:
     api-key: ${MINIMAX_API_KEY:your-api-key-here}
@@ -43,9 +50,21 @@ ai-models:
     temperature: 0.7
     max-tokens: 1024
 
-server:
-  port: 8081
-
-logging:
-  level:
-    com.example.ai: DEBUG
+---
+# PgVector profile for production
+spring:
+  config:
+    activate:
+      on-profile: pgvector
+  datasource:
+    url: jdbc:postgresql://localhost:5432/ai_service
+    username: postgres
+    password: ${PG_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect

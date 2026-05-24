@@ -3,6 +3,7 @@ package com.example.ai.controller;
 import com.example.ai.common.Result;
 import com.example.ai.model.dto.RagRequest;
 import com.example.ai.model.dto.UploadResponse;
+import com.example.ai.model.entity.UploadedDocument;
 import com.example.ai.service.rag.DocumentService;
 import com.example.ai.service.rag.RagService;
 import jakarta.validation.Valid;
@@ -23,7 +24,11 @@ public class RagController {
 
     @PostMapping("/upload")
     public Result<UploadResponse> upload(@RequestParam("file") MultipartFile file) throws Exception {
-        int chunkCount = ragService.ingestDocument(file.getOriginalFilename());
+        // 先保存文件到磁盘
+        UploadedDocument savedDoc = documentService.saveDocument(file);
+
+        // 用保存后的文件路径加载文档
+        int chunkCount = ragService.ingestDocument(savedDoc.getFilePath());
 
         UploadResponse response = UploadResponse.builder()
                 .filename(file.getOriginalFilename())
