@@ -3,6 +3,7 @@ package com.example.ai.service.rag;
 import com.example.ai.infrastructure.embedding.EmbeddingStore;
 import com.example.ai.infrastructure.embedding.EmbeddedChunk;
 import com.example.ai.model.dto.RagRequest;
+import com.example.ai.model.rag.RagQueryResult;
 import com.example.ai.rag.*;
 import com.example.ai.service.llm.ModelFactory;
 import com.example.ai.service.rag.RagTracer;
@@ -102,6 +103,69 @@ public class RagService {
         tracer.logFinalContext(context.length(), prompt.length());
         tracer.logAnswer(answer);
         return answer;
+    }
+
+    public RagQueryResult queryWithMetadata(RagRequest request) {
+        String originalQuestion = request.getQuestion();
+        tracer.logQuery(originalQuestion);
+        List<String> queries = generateMultipleQueries(originalQuestion);
+        tracer.logMultiQuery(queries.size());
+
+        int totalChunks = embeddingStore.size();
+        int topK = calculateDynamicTopK(totalChunks, request.getTopK());
+
+        Set<String> seenTexts = new HashSet<>();
+        List<EmbeddedChunk> mergedChunks = new ArrayList<>();
+        for (String q : queries) {
+            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK * 3);
+            if (chunks != null) {
+                for (EmbeddedChunk chunk : chunks) {
+                    String text = chunk.segment.text();
+                    if (!seenTexts.contains(text)) {
+                        seenTexts.add(text);
+                        mergedChunks.add(chunk);
+                    }
+                }
+            }
+        }
+
+        List<RagChunkInfo> chunkInfos = mergedChunks.stream()
+            .map(c -> new RagChunkInfo(c.segment.text(), 0.0))
+            .toList();
+        tracer.logRetrieval(chunkInfos.size());
+        tracer.logRetrievalDetails(chunkInfos);
+
+        List<EmbeddedChunk> rerankedChunks = rerankAndFilter(originalQuestion, mergedChunks, topK);
+
+        List<RerankEntry> beforeEntries = mergedChunks.stream()
+            .map(c -> new RerankEntry(c.segment.text(), 0.0))
+            .toList();
+        List<RerankEntry> afterEntries = rerankedChunks.stream()
+            .map(c -> new RerankEntry(c.segment.text(), 0.0))
+            .toList();
+        tracer.logRerank(mergedChunks.size(), rerankedChunks.size(), 5.0);
+        tracer.logRerankDetails(beforeEntries, afterEntries);
+
+        StringBuilder context = new StringBuilder();
+        int index = 1;
+        for (EmbeddedChunk chunk : rerankedChunks) {
+            String text = chunk.segment.text();
+            if (text.length() < 50) continue;
+            context.append("[").append(index).append("] ").append(text).append("\n\n");
+            index++;
+        }
+
+        String prompt = buildPrompt(originalQuestion, context.toString());
+
+        RagAssistant assistant = AiServices.builder(RagAssistant.class)
+                .chatLanguageModel(modelFactory.getDefaultModel())
+                .build();
+
+        String answer = assistant.chat(prompt);
+        tracer.logFinalContext(context.length(), prompt.length());
+        tracer.logAnswer(answer);
+
+        return new RagQueryResult(answer, mergedChunks.size(), rerankedChunks.size(), context.length(), prompt.length());
     }
 
     private List<EmbeddedChunk> rerankAndFilter(String question, List<EmbeddedChunk> candidates, int topK) {

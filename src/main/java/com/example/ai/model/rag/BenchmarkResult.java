@@ -4,6 +4,7 @@ public record BenchmarkResult(
     String question,
     String[] expectedKeywords,
     boolean expectReject,
+    int retrievalChunkCount,
     int retrievalHitCount,
     int answerLength,
     boolean answerContainsExpectedKeywords,

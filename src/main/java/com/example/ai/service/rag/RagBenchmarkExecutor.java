@@ -2,6 +2,7 @@ package com.example.ai.service.rag;
 
 import com.example.ai.model.dto.RagRequest;
 import com.example.ai.model.rag.BenchmarkResult;
+import com.example.ai.model.rag.RagQueryResult;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,8 +40,8 @@ public class RagBenchmarkExecutor {
                 RagRequest request = new RagRequest();
                 request.setQuestion(qCase.question);
 
-                String answer = ragService.query(request);
-                BenchmarkResult result = evaluateCase(qCase, answer);
+                RagQueryResult queryResult = ragService.queryWithMetadata(request);
+                BenchmarkResult result = evaluateCase(qCase, queryResult);
                 results.add(result);
 
                 printResult(result);
@@ -50,6 +51,7 @@ public class RagBenchmarkExecutor {
                     qCase.question,
                     qCase.expectedKeywords,
                     qCase.expectReject,
+                    -1,
                     -1,
                     -1,
                     false,
@@ -66,14 +68,15 @@ public class RagBenchmarkExecutor {
         return results;
     }
 
-    private BenchmarkResult evaluateCase(QuestionCase qCase, String answer) {
+    private BenchmarkResult evaluateCase(QuestionCase qCase, RagQueryResult queryResult) {
         int hitCount = 0;
         for (String kw : qCase.expectedKeywords) {
-            if (answer.contains(kw)) {
+            if (queryResult.answer().contains(kw)) {
                 hitCount++;
             }
         }
 
+        int retrievalChunks = queryResult.retrievalChunkCount();
         boolean answerContainsKeywords = hitCount > 0;
         boolean hallucination = false;
 
@@ -87,11 +90,12 @@ public class RagBenchmarkExecutor {
             qCase.question,
             qCase.expectedKeywords,
             qCase.expectReject,
+            retrievalChunks,
             hitCount,
-            answer.length(),
+            queryResult.answer().length(),
             answerContainsKeywords,
             hallucination,
-            answer
+            queryResult.answer()
         );
     }
 
@@ -106,16 +110,19 @@ public class RagBenchmarkExecutor {
         } else {
             if (result.hallucination()) {
                 verdict = "[FAIL] Hallucination detected";
+            } else if (result.retrievalChunkCount() == 0) {
+                verdict = "[FAIL] No retrieval chunks";
             } else {
                 verdict = "[PASS] Answer valid";
             }
         }
 
         System.out.printf("   Verdict: %s%n", verdict);
+        System.out.printf("   Retrieval Chunks: %d%n", result.retrievalChunkCount());
         System.out.printf("   Hit Count: %d/%d%n", result.retrievalHitCount(), result.expectedKeywords().length);
         System.out.printf("   Answer Length: %d chars%n", result.answerLength());
 
-        if (result.retrievalHitCount() >= 0) {
+        if (result.answer().length() > 0) {
             String preview = result.answer().length() > 150
                 ? result.answer().substring(0, 150) + "..."
                 : result.answer();
@@ -129,17 +136,19 @@ public class RagBenchmarkExecutor {
         int fail = 0;
         int error = 0;
         int hallucination = 0;
+        int noRetrieval = 0;
 
         for (BenchmarkResult r : results) {
-            if (r.retrievalHitCount() < 0) {
+            if (r.retrievalChunkCount() < 0) {
                 error++;
             } else if (r.expectReject() && !r.hallucination()) {
                 pass++;
-            } else if (!r.expectReject() && !r.hallucination() && r.answerContainsExpectedKeywords()) {
+            } else if (!r.expectReject() && !r.hallucination() && r.retrievalChunkCount() > 0) {
                 pass++;
             } else {
                 fail++;
                 if (r.hallucination()) hallucination++;
+                if (r.retrievalChunkCount() == 0) noRetrieval++;
             }
         }
 
@@ -151,6 +160,7 @@ public class RagBenchmarkExecutor {
         System.out.printf("   Total: %d | Pass: %d | Fail: %d | Error: %d%n", total, pass, fail, error);
         System.out.printf("   Pass Rate: %.1f%%%n", passRate);
         System.out.printf("   Hallucination Cases: %d%n", hallucination);
+        System.out.printf("   No Retrieval Cases: %d%n", noRetrieval);
         System.out.println("========================================\n");
     }
 
@@ -161,19 +171,25 @@ public class RagBenchmarkExecutor {
 
         int pass = 0;
         int fail = 0;
+        int hallucination = 0;
+        int noRetrieval = 0;
         for (BenchmarkResult r : results) {
-            if (r.retrievalHitCount() < 0) {
+            if (r.retrievalChunkCount() < 0) {
                 continue;
             } else if (r.expectReject() && !r.hallucination()) {
                 pass++;
-            } else if (!r.expectReject() && !r.hallucination() && r.answerContainsExpectedKeywords()) {
+            } else if (!r.expectReject() && !r.hallucination() && r.retrievalChunkCount() > 0) {
                 pass++;
             } else {
                 fail++;
+                if (r.hallucination()) hallucination++;
+                if (r.retrievalChunkCount() == 0) noRetrieval++;
             }
         }
         report.put("passCount", pass);
         report.put("failCount", fail);
+        report.put("hallucinationCount", hallucination);
+        report.put("noRetrievalCount", noRetrieval);
         report.put("passRate", String.format("%.2f%%", results.isEmpty() ? 0 : (double) pass / results.size() * 100));
 
         report.put("results", results);
@@ -188,17 +204,4 @@ public class RagBenchmarkExecutor {
         String[] expectedKeywords,
         boolean expectReject
     ) {}
-
-    public static void main(String[] args) throws Exception {
-        List<QuestionCase> cases = List.of(
-            new QuestionCase("Spring Boot 中 @Autowired 注解的注入方式有哪几种？", new String[]{"构造器注入", "setter注入", "字段注入"}, false),
-            new QuestionCase("JPA 和 MyBatis 在事务管理上的核心区别是什么？", new String[]{"JPA", "MyBatis", "事务", "EntityManager"}, false),
-            new QuestionCase("Redis 的持久化机制有哪几种？", new String[]{"RDB", "AOF", "持久化"}, false),
-            new QuestionCase("一个从未见过的完全无关问题：量子计算如何改变 RSA 加密算法？", new String[]{}, true)
-        );
-
-        System.out.println("RAG Benchmark Runner");
-        System.out.println("Usage: Run via Spring Boot or POST request to trigger benchmark");
-        System.out.println("This main() is for reference only. Use RagBenchmarkController to trigger.");
-    }
 }
