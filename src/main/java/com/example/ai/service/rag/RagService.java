@@ -180,13 +180,15 @@ public class RagService {
 
         // 构建 rerank prompt
         StringBuilder sb = new StringBuilder();
-        sb.append("你是一个相关性评分助手，请根据用户问题给每个候选文本打分（0-10）：\n\n");
-        sb.append("评分标准：\n");
+        sb.append("你是一个相关性评分助手，请根据用户问题给每个候选文本打分。\n\n");
+        sb.append("评分要求：\n");
+        sb.append("- 评分范围必须是0-1，0表示完全无关，1表示非常相关\n");
+        sb.append("- 请严格按此范围评分，不要超出\n");
         sb.append("- 是否直接回答问题\n");
         sb.append("- 是否包含关键信息\n");
         sb.append("- 是否语义相关\n\n");
         sb.append("输出格式：\n");
-        sb.append("[编号] 分数\n\n");
+        sb.append("[编号] 分数（0-1之间）\n\n");
         sb.append("用户问题：").append(question).append("\n\n");
         sb.append("候选文本：\n");
         for (int i = 0; i < candidates.size(); i++) {
@@ -208,7 +210,7 @@ public class RagService {
                 String[] parts = line.split("\\]\\s*");
                 int idx = Integer.parseInt(parts[0].substring(1)) - 1;
                 double score = Double.parseDouble(parts[1]);
-                if (idx >= 0 && idx < candidates.size() && score >= 5) {
+                if (idx >= 0 && idx < candidates.size() && score >= 0.5) {
                     scored.add(new ScoredChunk(candidates.get(idx), score));
                 }
             }
