@@ -5,6 +5,9 @@ import com.example.ai.infrastructure.embedding.EmbeddedChunk;
 import com.example.ai.model.dto.RagRequest;
 import com.example.ai.rag.*;
 import com.example.ai.service.llm.ModelFactory;
+import com.example.ai.service.rag.RagTracer;
+import com.example.ai.service.rag.RagTracer.RagChunkInfo;
+import com.example.ai.service.rag.RagTracer.RerankEntry;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ public class RagService {
     private final ModelFactory modelFactory;
     private final TextSplitter textSplitter;
     private final EmbeddingStore embeddingStore;
+    private final RagTracer tracer;
 
     public int ingestDocument(String filePath) throws Exception {
         DocumentLoader loader = new DocumentLoader();
@@ -38,7 +42,9 @@ public class RagService {
 
     public String query(RagRequest request) {
         String originalQuestion = request.getQuestion();
+        tracer.logQuery(originalQuestion);
         List<String> queries = generateMultipleQueries(originalQuestion);
+        tracer.logMultiQuery(queries.size());
 
         int totalChunks = embeddingStore.size();
         int topK = calculateDynamicTopK(totalChunks, request.getTopK());
@@ -59,8 +65,23 @@ public class RagService {
             }
         }
 
+        List<RagChunkInfo> chunkInfos = mergedChunks.stream()
+            .map(c -> new RagChunkInfo(c.segment.text(), 0.0))
+            .toList();
+        tracer.logRetrieval(chunkInfos.size());
+        tracer.logRetrievalDetails(chunkInfos);
+
         // rerank 排序
         List<EmbeddedChunk> rerankedChunks = rerankAndFilter(originalQuestion, mergedChunks, topK);
+
+        List<RerankEntry> beforeEntries = mergedChunks.stream()
+            .map(c -> new RerankEntry(c.segment.text(), 0.0))
+            .toList();
+        List<RerankEntry> afterEntries = rerankedChunks.stream()
+            .map(c -> new RerankEntry(c.segment.text(), 0.0))
+            .toList();
+        tracer.logRerank(mergedChunks.size(), rerankedChunks.size(), 5.0);
+        tracer.logRerankDetails(beforeEntries, afterEntries);
 
         StringBuilder context = new StringBuilder();
         int index = 1;
@@ -77,7 +98,10 @@ public class RagService {
                 .chatLanguageModel(modelFactory.getDefaultModel())
                 .build();
 
-        return assistant.chat(prompt);
+        String answer = assistant.chat(prompt);
+        tracer.logFinalContext(context.length(), prompt.length());
+        tracer.logAnswer(answer);
+        return answer;
     }
 
     private List<EmbeddedChunk> rerankAndFilter(String question, List<EmbeddedChunk> candidates, int topK) {
