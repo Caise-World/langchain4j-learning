@@ -42,12 +42,22 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
         return findRelevantChunks(queryEmbedding, topK, threshold);
     }
 
-    public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults, double threshold) {
+    public List<ScoredChunk> findRelevantWithScores(String text, int topK) {
+        Embedding queryEmbedding = createEmbedding(text);
+        return findRelevantChunksWithScores(queryEmbedding, topK, 0.0);
+    }
+
+    public List<ScoredChunk> findRelevantChunksWithScores(Embedding queryEmbedding, int maxResults, double threshold) {
         return chunks.stream()
                 .map(chunk -> new ScoredChunk(chunk, cosineSimilarity(queryEmbedding, chunk.embedding)))
                 .filter(sc -> sc.getScore() >= threshold)
                 .sorted(Comparator.comparingDouble(ScoredChunk::getScore).reversed())
                 .limit(maxResults)
+                .toList();
+    }
+
+    public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults, double threshold) {
+        return findRelevantChunksWithScores(queryEmbedding, maxResults, threshold).stream()
                 .map(ScoredChunk::getChunk)
                 .toList();
     }
@@ -114,16 +124,16 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
         return chunks.size();
     }
 
-    private static class ScoredChunk {
-        final EmbeddedChunk chunk;
-        final double score;
+    public static class ScoredChunk {
+        private final EmbeddedChunk chunk;
+        private final double score;
 
-        ScoredChunk(EmbeddedChunk chunk, double score) {
+        public ScoredChunk(EmbeddedChunk chunk, double score) {
             this.chunk = chunk;
             this.score = score;
         }
 
-        EmbeddedChunk getChunk() { return chunk; }
-        double getScore() { return score; }
+        public EmbeddedChunk getChunk() { return chunk; }
+        public double getScore() { return score; }
     }
 }

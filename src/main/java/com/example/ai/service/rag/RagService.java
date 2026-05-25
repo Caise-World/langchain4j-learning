@@ -2,6 +2,7 @@ package com.example.ai.service.rag;
 
 import com.example.ai.infrastructure.embedding.EmbeddingStore;
 import com.example.ai.infrastructure.embedding.EmbeddedChunk;
+import com.example.ai.infrastructure.embedding.InMemoryEmbeddingStore;
 import com.example.ai.model.dto.RagRequest;
 import com.example.ai.model.rag.RagQueryResult;
 import com.example.ai.rag.*;
@@ -115,30 +116,34 @@ public class RagService {
         int topK = calculateDynamicTopK(totalChunks, request.getTopK());
 
         Set<String> seenTexts = new HashSet<>();
-        List<EmbeddedChunk> mergedChunks = new ArrayList<>();
+        List<InMemoryEmbeddingStore.ScoredChunk> mergedScoredChunks = new ArrayList<>();
         for (String q : queries) {
-            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK * 3);
-            if (chunks != null) {
-                for (EmbeddedChunk chunk : chunks) {
-                    String text = chunk.segment.text();
+            List<InMemoryEmbeddingStore.ScoredChunk> scoredChunks = embeddingStore.findRelevantWithScores(q, topK * 3);
+            if (scoredChunks != null) {
+                for (InMemoryEmbeddingStore.ScoredChunk sc : scoredChunks) {
+                    String text = sc.getChunk().segment.text();
                     if (!seenTexts.contains(text)) {
                         seenTexts.add(text);
-                        mergedChunks.add(chunk);
+                        mergedScoredChunks.add(sc);
                     }
                 }
             }
         }
 
-        List<RagChunkInfo> chunkInfos = mergedChunks.stream()
-            .map(c -> new RagChunkInfo(c.segment.text(), 0.0))
+        List<EmbeddedChunk> mergedChunks = mergedScoredChunks.stream()
+            .map(InMemoryEmbeddingStore.ScoredChunk::getChunk)
+            .toList();
+
+        List<RagChunkInfo> chunkInfos = mergedScoredChunks.stream()
+            .map(sc -> new RagChunkInfo(sc.getChunk().segment.text(), sc.getScore()))
             .toList();
         tracer.logRetrieval(chunkInfos.size());
         tracer.logRetrievalDetails(chunkInfos);
 
         List<EmbeddedChunk> rerankedChunks = rerankAndFilter(originalQuestion, mergedChunks, topK);
 
-        List<RerankEntry> beforeEntries = mergedChunks.stream()
-            .map(c -> new RerankEntry(c.segment.text(), 0.0))
+        List<RerankEntry> beforeEntries = mergedScoredChunks.stream()
+            .map(sc -> new RerankEntry(sc.getChunk().segment.text(), sc.getScore()))
             .toList();
         List<RerankEntry> afterEntries = rerankedChunks.stream()
             .map(c -> new RerankEntry(c.segment.text(), 0.0))

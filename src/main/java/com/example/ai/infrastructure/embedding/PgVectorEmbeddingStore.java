@@ -89,6 +89,11 @@ public class PgVectorEmbeddingStore implements EmbeddingStore {
     }
 
     @Override
+    public List<InMemoryEmbeddingStore.ScoredChunk> findRelevantWithScores(String text, int topK) {
+        throw new UnsupportedOperationException("PgVector does not expose per-chunk similarity scores");
+    }
+
+    @Override
     public Embedding createEmbedding(String text) {
         float[] vector = new float[DIMENSION];
         for (int i = 0; i < text.length() && i < DIMENSION; i++) {
