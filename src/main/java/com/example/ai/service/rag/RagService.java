@@ -199,7 +199,7 @@ public class RagService {
         String[] lines = result.split("\n");
         for (String line : lines) {
             line = line.trim();
-            if (line.matches("\\[\\d+\\]\\s*\\d+")) {
+            if (line.matches("\\[\\d+\\]\\s*\\d+(\\.\\d+)?")) {
                 String[] parts = line.split("\\]\\s*");
                 int idx = Integer.parseInt(parts[0].substring(1)) - 1;
                 double score = Double.parseDouble(parts[1]);
