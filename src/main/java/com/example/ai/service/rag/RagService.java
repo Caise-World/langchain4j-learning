@@ -347,9 +347,16 @@ public class RagService {
 
     public void streamQuery(String question, SseEmitter emitter) {
         try {
+            int totalChunks = embeddingStore.size();
+
+            // Hybrid mode: if no documents, fallback to direct LLM answer
+            if (totalChunks == 0) {
+                streamDirectAnswer(question, emitter);
+                return;
+            }
+
             // Retrieval phase
             List<String> queries = generateMultipleQueries(question);
-            int totalChunks = embeddingStore.size();
             int topK = calculateDynamicTopK(totalChunks, 5);
 
             Set<String> seenTexts = new HashSet<>();
@@ -409,6 +416,27 @@ public class RagService {
         } catch (Exception e) {
             emitter.completeWithError(e);
         }
+    }
+
+    private void streamDirectAnswer(String question, SseEmitter emitter) throws Exception {
+        // No metadata (empty citations)
+        emitter.send(SseEmitter.event().name("metadata").data("[]"));
+
+        // Direct LLM answer without RAG
+        RagAssistant assistant = AiServices.builder(RagAssistant.class)
+                .chatLanguageModel(modelFactory.getDefaultModel())
+                .build();
+
+        String fullResponse = assistant.chat(question);
+
+        // Stream character by character
+        for (char c : fullResponse.toCharArray()) {
+            emitter.send(SseEmitter.event().name("message").data(String.valueOf(c)));
+            Thread.sleep(20);
+        }
+
+        emitter.send(SseEmitter.event().name("message").data("[DONE]"));
+        emitter.complete();
     }
 
     private String buildMetadataJson(List<CitationChunk> chunks) {
