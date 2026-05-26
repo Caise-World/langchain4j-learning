@@ -34,11 +34,18 @@ const { isStreaming, streamChat } = useStreamChat()
 const messagesContainer = ref(null)
 const messages = store.messages
 
-async function handleSend(text) {
-  store.addUserMessage(text)
+console.log('[ChatView] Initial messages:', messages.value.length)
 
-  const assistantId = Date.now()
+async function handleSend(text) {
+  const userId = generateUUID()
+  console.log('[ChatView] Sending:', text, 'userId:', userId)
+  store.addUserMessage(text)
+  console.log('[ChatView] After user msg, messages:', messages.value.map(m => ({ id: m.id, role: m.role })))
+
+  const assistantId = generateUUID()
+  console.log('[ChatView] Creating assistant msg with id:', assistantId)
   store.addAssistantMessage('', assistantId)
+  console.log('[ChatView] After assistant msg, messages:', messages.value.map(m => ({ id: m.id, role: m.role, content: m.content.substring(0, 20) })))
   store.setStreaming(true)
 
   await nextTick()
@@ -56,6 +63,7 @@ async function handleSend(text) {
       nextTick(() => scrollToBottom())
     },
     onDone: () => {
+      console.log('[ChatView] Stream done, final messages:', messages.value.map(m => ({ id: m.id, role: m.role, content: m.content.substring(0, 30) })))
       store.setStreaming(false)
     }
   })

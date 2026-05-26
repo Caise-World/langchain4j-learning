@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
+let idCounter = 0
+
+function generateId() {
+  return `msg_${Date.now()}_${++idCounter}`
+}
+
 export const useChatStore = defineStore('chat', () => {
   const messages = ref([])
   const sessionId = ref(null)
@@ -8,7 +14,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function addUserMessage(content) {
     messages.value.push({
-      id: Date.now(),
+      id: generateId(),
       role: 'user',
       content
     })
@@ -16,7 +22,7 @@ export const useChatStore = defineStore('chat', () => {
 
   function addAssistantMessage(content, id) {
     messages.value.push({
-      id: id || Date.now(),
+      id: id || generateId(),
       role: 'assistant',
       content
     })
