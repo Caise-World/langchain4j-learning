@@ -64,17 +64,24 @@ function handleDrop(event) {
 
 async function uploadFiles(filesToUpload) {
   for (const file of filesToUpload) {
-    const fileObj = { name: file.name, status: 'uploading' }
-    files.value.push(fileObj)
+    const fileIndex = files.value.length
+    files.value.push({ name: file.name, status: 'uploading' })
+    const fileObj = files.value[fileIndex]
 
     try {
       const formData = new FormData()
       formData.append('file', file)
 
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000)
+
       const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        signal: controller.signal
       })
+
+      clearTimeout(timeoutId)
 
       if (response.ok) {
         fileObj.status = 'success'
@@ -82,6 +89,7 @@ async function uploadFiles(filesToUpload) {
         fileObj.status = 'failed'
       }
     } catch (e) {
+      console.error('Upload error:', e)
       fileObj.status = 'failed'
     }
   }
