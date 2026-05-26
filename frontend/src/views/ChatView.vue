@@ -2,19 +2,23 @@
   <div class="chat-view">
     <header class="chat-header">
       <h1>AI Chat</h1>
-      <button class="clear-btn" @click="clearChat">清空会话</button>
+      <div class="header-actions">
+        <router-link to="/knowledge" class="nav-link">知识库</router-link>
+        <button class="clear-btn" @click="clearChat">清空会话</button>
+      </div>
     </header>
 
     <main class="chat-messages" ref="messagesContainer">
       <div v-if="messages.length === 0" class="empty-state">
         <p>你好！有什么可以帮你的吗？</p>
       </div>
-      <MessageBubble
-        v-for="msg in messages"
-        :key="msg.id"
-        :role="msg.role"
-        :content="msg.content"
-      />
+      <div v-for="msg in messages" :key="msg.id" class="message-wrapper">
+        <MessageBubble :role="msg.role" :content="msg.content" />
+        <CitationBlock
+          v-if="msg.role === 'assistant' && msg.citations.length > 0"
+          :citations="msg.citations"
+        />
+      </div>
     </main>
 
     <ChatInput :loading="isStreaming" @send="handleSend" />
@@ -27,6 +31,7 @@ import { useChatStore } from '../stores/chat.js'
 import { useStreamChat } from '../composables/useStreamChat.js'
 import MessageBubble from '../components/MessageBubble.vue'
 import ChatInput from '../components/ChatInput.vue'
+import CitationBlock from '../components/CitationBlock.vue'
 
 const store = useChatStore()
 const { isStreaming, streamChat } = useStreamChat()
@@ -35,11 +40,10 @@ const messagesContainer = ref(null)
 const messages = store.messages
 
 async function handleSend(text) {
-  const userId = generateUUID()
   store.addUserMessage(text)
 
   const assistantId = generateUUID()
-  store.addAssistantMessage('', assistantId)
+  store.addAssistantMessage('', assistantId, [])
   store.setStreaming(true)
 
   await nextTick()
@@ -56,6 +60,9 @@ async function handleSend(text) {
       store.updateAssistantMessage(assistantId, fullResponse)
       nextTick(() => scrollToBottom())
     },
+    onMetadata: (citations) => {
+      store.updateAssistantCitations(assistantId, citations)
+    },
     onDone: () => {
       store.setStreaming(false)
     }
@@ -64,7 +71,6 @@ async function handleSend(text) {
 
 function clearChat() {
   store.clearMessages()
-  sessionStorage.removeItem('currentSessionId')
 }
 
 function scrollToBottom() {
@@ -114,9 +120,31 @@ function generateUUID() {
   background: var(--bg-hover);
 }
 
+.nav-link {
+  padding: 8px 16px;
+  color: var(--accent-color);
+  text-decoration: none;
+  border-radius: var(--radius);
+}
+
+.nav-link:hover {
+  background: var(--bg-hover);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
+}
+
+.message-wrapper {
+  display: flex;
+  flex-direction: column;
 }
 
 .empty-state {

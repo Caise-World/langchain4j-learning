@@ -4,7 +4,7 @@ export function useStreamChat() {
   const isStreaming = ref(false)
   const error = ref(null)
 
-  async function streamChat({ message, sessionId = null, modelType = null, onChunk, onDone }) {
+  async function streamChat({ message, sessionId = null, modelType = null, onChunk, onMetadata, onDone }) {
     isStreaming.value = true
     error.value = null
 
@@ -27,6 +27,7 @@ export function useStreamChat() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let currentEvent = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -39,22 +40,34 @@ export function useStreamChat() {
         for (const line of lines) {
           const trimmed = line.trim()
           if (trimmed.startsWith('event:')) {
-            // ignore event type
+            currentEvent = trimmed.slice(6).trim()
           } else if (trimmed.startsWith('data: ')) {
             const data = trimmed.slice(6)
-            if (data === '[DONE]') {
+            if (currentEvent === 'metadata') {
+              try {
+                const citations = JSON.parse(data)
+                onMetadata?.(citations)
+              } catch (e) {
+                // ignore parse error
+              }
+            } else if (data === '[DONE]') {
               onDone?.()
               return
-            }
-            if (data && data.trim()) {
+            } else if (currentEvent === 'message' && data && data.trim()) {
               onChunk?.(data)
             }
           } else if (trimmed === 'data:') {
             // empty data line, skip
           } else if (trimmed.startsWith('data:')) {
-            // handles `data:xxx` without space
             const data = trimmed.slice(5)
-            if (data && data.trim()) {
+            if (currentEvent === 'metadata') {
+              try {
+                const citations = JSON.parse(data)
+                onMetadata?.(citations)
+              } catch (e) {
+                // ignore parse error
+              }
+            } else if (data && data.trim()) {
               onChunk?.(data)
             }
           }

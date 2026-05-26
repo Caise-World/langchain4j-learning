@@ -16,15 +16,17 @@ export const useChatStore = defineStore('chat', () => {
     messages.value.push({
       id: generateId(),
       role: 'user',
-      content
+      content,
+      citations: []
     })
   }
 
-  function addAssistantMessage(content, id) {
+  function addAssistantMessage(content, id, citations = []) {
     messages.value.push({
       id: id || generateId(),
       role: 'assistant',
-      content
+      content,
+      citations
     })
   }
 
@@ -32,6 +34,13 @@ export const useChatStore = defineStore('chat', () => {
     const msg = messages.value.find(m => m.id === id)
     if (msg) {
       msg.content = content
+    }
+  }
+
+  function updateAssistantCitations(id, citations) {
+    const msg = messages.value.find(m => m.id === id)
+    if (msg) {
+      msg.citations = citations
     }
   }
 
@@ -54,6 +63,7 @@ export const useChatStore = defineStore('chat', () => {
     addUserMessage,
     addAssistantMessage,
     updateAssistantMessage,
+    updateAssistantCitations,
     setSessionId,
     setStreaming,
     clearMessages
