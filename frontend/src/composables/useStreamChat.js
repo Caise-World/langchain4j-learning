@@ -24,13 +24,9 @@ export function useStreamChat() {
         throw new Error(`HTTP ${response.status}`)
       }
 
-      console.log('[SSE] Stream started')
-
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
-      let eventType = null
-      let chunkCount = 0
 
       while (true) {
         const { done, value } = await reader.read()
@@ -43,16 +39,14 @@ export function useStreamChat() {
         for (const line of lines) {
           const trimmed = line.trim()
           if (trimmed.startsWith('event:')) {
-            eventType = trimmed.slice(6).trim()
+            // ignore event type
           } else if (trimmed.startsWith('data: ')) {
             const data = trimmed.slice(6)
             if (data === '[DONE]') {
-              console.log('[SSE] Done received, chunks:', chunkCount)
               onDone?.()
               return
             }
             if (data && data.trim()) {
-              chunkCount++
               onChunk?.(data)
             }
           } else if (trimmed === 'data:') {
@@ -61,17 +55,14 @@ export function useStreamChat() {
             // handles `data:xxx` without space
             const data = trimmed.slice(5)
             if (data && data.trim()) {
-              chunkCount++
               onChunk?.(data)
             }
           }
         }
       }
 
-      console.log('[SSE] Stream ended, total chunks:', chunkCount)
       onDone?.()
     } catch (e) {
-      console.error('[SSE] Error:', e)
       error.value = e.message
     } finally {
       isStreaming.value = false
