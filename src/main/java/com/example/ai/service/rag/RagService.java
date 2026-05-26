@@ -13,6 +13,7 @@ import com.example.ai.service.rag.RagTracer.RerankEntry;
 import dev.langchain4j.service.AiServices;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -340,5 +341,94 @@ public class RagService {
 
     public interface Reranker {
         String rerank(String prompt);
+    }
+
+    public record CitationChunk(int index, String content, double score) {}
+
+    public void streamQuery(String question, SseEmitter emitter) {
+        try {
+            // Retrieval phase
+            List<String> queries = generateMultipleQueries(question);
+            int totalChunks = embeddingStore.size();
+            int topK = calculateDynamicTopK(totalChunks, 5);
+
+            Set<String> seenTexts = new HashSet<>();
+            List<InMemoryEmbeddingStore.ScoredChunk> mergedScoredChunks = new ArrayList<>();
+            for (String q : queries) {
+                List<InMemoryEmbeddingStore.ScoredChunk> scoredChunks = embeddingStore.findRelevantWithScores(q, topK * 3);
+                if (scoredChunks != null) {
+                    for (InMemoryEmbeddingStore.ScoredChunk sc : scoredChunks) {
+                        String text = sc.getChunk().segment.text();
+                        if (!seenTexts.contains(text)) {
+                            seenTexts.add(text);
+                            mergedScoredChunks.add(sc);
+                        }
+                    }
+                }
+            }
+
+            List<EmbeddedChunk> mergedChunks = mergedScoredChunks.stream()
+                .map(InMemoryEmbeddingStore.ScoredChunk::getChunk)
+                .toList();
+
+            // Rerank
+            List<EmbeddedChunk> rerankedChunks = rerankAndFilter(question, mergedChunks, topK);
+
+            // Build context and send metadata first
+            StringBuilder context = new StringBuilder();
+            List<CitationChunk> citationChunks = new ArrayList<>();
+            int index = 1;
+            for (EmbeddedChunk chunk : rerankedChunks) {
+                String text = chunk.segment.text();
+                if (text.length() < 50) continue;
+                context.append("[").append(index).append("] ").append(text).append("\n\n");
+                citationChunks.add(new CitationChunk(index, text, 0.0));
+                index++;
+            }
+
+            // Send metadata event with citation chunks
+            String metadataJson = buildMetadataJson(citationChunks);
+            emitter.send(SseEmitter.event().name("metadata").data(metadataJson));
+
+            // Build prompt and get answer
+            String prompt = buildPrompt(question, context.toString());
+            RagAssistant assistant = AiServices.builder(RagAssistant.class)
+                    .chatLanguageModel(modelFactory.getDefaultModel())
+                    .build();
+
+            String fullResponse = assistant.chat(prompt);
+
+            // Stream character by character
+            for (char c : fullResponse.toCharArray()) {
+                emitter.send(SseEmitter.event().name("message").data(String.valueOf(c)));
+                Thread.sleep(20);
+            }
+
+            emitter.send(SseEmitter.event().name("message").data("[DONE]"));
+            emitter.complete();
+        } catch (Exception e) {
+            emitter.completeWithError(e);
+        }
+    }
+
+    private String buildMetadataJson(List<CitationChunk> chunks) {
+        StringBuilder json = new StringBuilder("[");
+        for (int i = 0; i < chunks.size(); i++) {
+            CitationChunk chunk = chunks.get(i);
+            if (i > 0) json.append(",");
+            json.append("{\"index\":").append(chunk.index())
+                .append(",\"content\":\"").append(escapeJson(chunk.content())).append("\"")
+                .append(",\"score\":").append(chunk.score()).append("}");
+        }
+        json.append("]");
+        return json.toString();
+    }
+
+    private String escapeJson(String text) {
+        return text.replace("\\", "\\\\")
+                  .replace("\"", "\\\"")
+                  .replace("\n", "\\n")
+                  .replace("\r", "\\r")
+                  .replace("\t", "\\t");
     }
 }

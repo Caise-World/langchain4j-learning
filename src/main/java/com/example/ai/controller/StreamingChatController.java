@@ -1,6 +1,6 @@
 package com.example.ai.controller;
 
-import com.example.ai.service.llm.LlmService;
+import com.example.ai.service.rag.RagService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -14,16 +14,12 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 public class StreamingChatController {
 
-    private final LlmService llmService;
+    private final RagService ragService;
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter chatStream(@RequestParam String message,
-                                 @RequestParam(required = false) String sessionId,
-                                 @RequestParam(required = false) String modelType) {
+    public SseEmitter chatStream(@RequestParam String message) {
         SseEmitter emitter = new SseEmitter();
-
-        llmService.streamChat(message, sessionId, modelType, emitter);
-
+        ragService.streamQuery(message, emitter);
         return emitter;
     }
 }
