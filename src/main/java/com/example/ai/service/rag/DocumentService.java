@@ -16,10 +16,14 @@ import java.util.UUID;
 public class DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final RagService ragService;
 
     public UploadedDocument saveDocument(MultipartFile file) throws Exception {
         Path tempFile = Path.of("/tmp/" + UUID.randomUUID() + "_" + file.getOriginalFilename());
         Files.copy(file.getInputStream(), tempFile, StandardCopyOption.REPLACE_EXISTING);
+
+        // Ingest into embedding store
+        ragService.ingestDocument(tempFile.toString());
 
         UploadedDocument doc = UploadedDocument.builder()
                 .filename(file.getOriginalFilename())
