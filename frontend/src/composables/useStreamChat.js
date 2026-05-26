@@ -27,6 +27,7 @@ export function useStreamChat() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let eventType = null
 
       while (true) {
         const { done, value } = await reader.read()
@@ -37,12 +38,23 @@ export function useStreamChat() {
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6).trim()
+          const trimmed = line.trim()
+          if (trimmed.startsWith('event:')) {
+            eventType = trimmed.slice(6).trim()
+          } else if (trimmed.startsWith('data: ')) {
+            const data = trimmed.slice(6)
             if (data === '[DONE]') {
               onDone?.()
               return
             }
+            if (data) {
+              onChunk?.(data)
+            }
+          } else if (trimmed === 'data:') {
+            // empty data line, skip
+          } else if (trimmed.startsWith('data:')) {
+            // handles `data:xxx` without space
+            const data = trimmed.slice(5)
             if (data) {
               onChunk?.(data)
             }
