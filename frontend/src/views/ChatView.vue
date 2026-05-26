@@ -50,6 +50,7 @@ async function handleSend(text) {
     message: text,
     sessionId: store.sessionId,
     onChunk: (chunk) => {
+      if (!chunk || chunk.trim() === '') return
       fullResponse += chunk
       store.updateAssistantMessage(assistantId, fullResponse)
       nextTick(() => scrollToBottom())
@@ -62,12 +63,21 @@ async function handleSend(text) {
 
 function clearChat() {
   store.clearMessages()
+  sessionStorage.removeItem('currentSessionId')
 }
 
 function scrollToBottom() {
   if (messagesContainer.value) {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    const v = c === 'x' ? r : (r & 0x3 | 0x8)
+    return v.toString(16)
+  })
 }
 </script>
 

@@ -47,7 +47,7 @@ export function useStreamChat() {
               onDone?.()
               return
             }
-            if (data) {
+            if (data && data.trim()) {
               onChunk?.(data)
             }
           } else if (trimmed === 'data:') {
@@ -55,7 +55,7 @@ export function useStreamChat() {
           } else if (trimmed.startsWith('data:')) {
             // handles `data:xxx` without space
             const data = trimmed.slice(5)
-            if (data) {
+            if (data && data.trim()) {
               onChunk?.(data)
             }
           }
