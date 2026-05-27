@@ -1,9 +1,11 @@
 package com.example.ai.config;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -14,19 +16,13 @@ public class PromptTemplateLoader {
 
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}]+)\\}");
 
+    @Autowired
+    private ResourceLoader resourceLoader;
+
     public String load(String classpathPath) {
-        String path = classpathPath;
-        if (path.startsWith("classpath:")) {
-            path = path.substring("classpath:".length());
-        }
-        if (!path.startsWith("/")) {
-            path = "/" + path;
-        }
-        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
-            if (is == null) {
-                throw new RuntimeException("Prompt file not found: " + classpathPath + " (tried path: " + path + ")");
-            }
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        Resource resource = resourceLoader.getResource(classpathPath);
+        try {
+            return new String(resource.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException("Failed to load prompt: " + classpathPath, e);
         }
