@@ -70,7 +70,7 @@ async function handleSend(text) {
 }
 
 function clearChat() {
-  store.clearMessages()
+  store.clearHistory()
 }
 
 function scrollToBottom() {
