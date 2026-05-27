@@ -15,7 +15,11 @@ public class PromptTemplateLoader {
     private static final Pattern PLACEHOLDER_PATTERN = Pattern.compile("\\{([^}]+)\\}");
 
     public String load(String classpathPath) {
-        try (InputStream is = getClass().getResourceAsStream(classpathPath)) {
+        String path = classpathPath;
+        if (path.startsWith("classpath:")) {
+            path = path.substring("classpath:".length());
+        }
+        try (InputStream is = getClass().getResourceAsStream(path)) {
             if (is == null) {
                 throw new RuntimeException("Prompt file not found: " + classpathPath);
             }
