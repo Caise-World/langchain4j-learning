@@ -19,9 +19,12 @@ public class PromptTemplateLoader {
         if (path.startsWith("classpath:")) {
             path = path.substring("classpath:".length());
         }
-        try (InputStream is = getClass().getResourceAsStream(path)) {
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        try (InputStream is = Thread.currentThread().getContextClassLoader().getResourceAsStream(path)) {
             if (is == null) {
-                throw new RuntimeException("Prompt file not found: " + classpathPath);
+                throw new RuntimeException("Prompt file not found: " + classpathPath + " (tried path: " + path + ")");
             }
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
