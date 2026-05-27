@@ -1,5 +1,7 @@
 package com.example.ai.service.rag;
 
+import com.example.ai.config.PromptProperties;
+import com.example.ai.config.PromptTemplateLoader;
 import com.example.ai.infrastructure.embedding.EmbeddingStore;
 import com.example.ai.infrastructure.embedding.EmbeddedChunk;
 import com.example.ai.infrastructure.embedding.InMemoryEmbeddingStore;
@@ -16,8 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -28,6 +32,8 @@ public class RagService {
     private final TextSplitter textSplitter;
     private final EmbeddingStore embeddingStore;
     private final RagTracer tracer;
+    private final PromptProperties promptProperties;
+    private final PromptTemplateLoader promptLoader;
 
     public int ingestDocument(String filePath) throws Exception {
         DocumentLoader loader = new DocumentLoader();
@@ -52,11 +58,10 @@ public class RagService {
         int totalChunks = embeddingStore.size();
         int topK = calculateDynamicTopK(totalChunks, request.getTopK());
 
-        // 多 query 分别检索，合并候选（扩大初筛范围用于 rerank）
         Set<String> seenTexts = new HashSet<>();
         List<EmbeddedChunk> mergedChunks = new ArrayList<>();
         for (String q : queries) {
-            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK * 3);  // 初筛扩大
+            List<EmbeddedChunk> chunks = embeddingStore.findRelevant(q, topK * 3);
             if (chunks != null) {
                 for (EmbeddedChunk chunk : chunks) {
                     String text = chunk.segment.text();
@@ -74,7 +79,6 @@ public class RagService {
         tracer.logRetrieval(chunkInfos.size());
         tracer.logRetrievalDetails(chunkInfos);
 
-        // rerank 排序
         List<EmbeddedChunk> rerankedChunks = rerankAndFilter(originalQuestion, mergedChunks, topK);
 
         List<RerankEntry> beforeEntries = mergedChunks.stream()
@@ -179,30 +183,22 @@ public class RagService {
             return candidates;
         }
 
-        // 构建 rerank prompt
-        StringBuilder sb = new StringBuilder();
-        sb.append("你是一个相关性评分助手，请根据用户问题给每个候选文本打分。\n\n");
-        sb.append("评分要求：\n");
-        sb.append("- 评分范围必须是0-1，0表示完全无关，1表示非常相关\n");
-        sb.append("- 请严格按此范围评分，不要超出\n");
-        sb.append("- 是否直接回答问题\n");
-        sb.append("- 是否包含关键信息\n");
-        sb.append("- 是否语义相关\n\n");
-        sb.append("输出格式：\n");
-        sb.append("[编号] 分数（0-1之间）\n\n");
-        sb.append("用户问题：").append(question).append("\n\n");
-        sb.append("候选文本：\n");
+        String rerankTemplate = promptLoader.load(promptProperties.getRerank());
+        StringBuilder chunksBuilder = new StringBuilder();
         for (int i = 0; i < candidates.size(); i++) {
-            sb.append("[").append(i + 1).append("] ").append(candidates.get(i).segment.text()).append("\n\n");
+            chunksBuilder.append("[").append(i + 1).append("] ").append(candidates.get(i).segment.text()).append("\n\n");
         }
+        String prompt = promptLoader.fill(rerankTemplate, Map.of(
+            "question", question,
+            "chunks", chunksBuilder.toString()
+        ));
 
         Reranker reranker = AiServices.builder(Reranker.class)
                 .chatLanguageModel(modelFactory.getDefaultModel())
                 .build();
 
-        String result = reranker.rerank(sb.toString());
+        String result = reranker.rerank(prompt);
 
-        // 解析分数并排序
         List<ScoredChunk> scored = new ArrayList<>();
         String[] lines = result.split("\n");
         for (String line : lines) {
@@ -217,7 +213,6 @@ public class RagService {
             }
         }
 
-        // 按分数降序，取 topK
         scored.sort((a, b) -> Double.compare(b.score, a.score));
         List<EmbeddedChunk> resultChunks = new ArrayList<>();
         for (int i = 0; i < Math.min(topK, scored.size()); i++) {
@@ -229,22 +224,14 @@ public class RagService {
     private record ScoredChunk(EmbeddedChunk chunk, double score) {}
 
     private List<String> generateMultipleQueries(String query) {
-        String multiQueryPrompt = """
-                你是检索优化助手，请基于用户问题生成3个不同的检索版本：
-                要求：
-                - 保留原意
-                - 从不同角度表达
-                - 包含关键词变体
-                - 输出3条，用换行分隔，不要解释
-
-                用户问题：%s
-                """.formatted(query);
+        String template = promptLoader.load(promptProperties.getMultiQuery());
+        String prompt = promptLoader.fill(template, "query", query);
 
         QueryExpander expander = AiServices.builder(QueryExpander.class)
                 .chatLanguageModel(modelFactory.getDefaultModel())
                 .build();
 
-        String result = expander.expand(multiQueryPrompt);
+        String result = expander.expand(prompt);
         List<String> queries = new ArrayList<>();
         for (String line : result.split("\n")) {
             String trimmed = line.trim();
@@ -252,7 +239,6 @@ public class RagService {
                 queries.add(trimmed);
             }
         }
-        // 至少保含原始查询
         if (queries.isEmpty()) {
             queries.add(query);
         }
@@ -260,54 +246,11 @@ public class RagService {
     }
 
     private String buildPrompt(String question, String context) {
-        return """
-                你是一个严格基于资料的知识库问答助手。
-
-                ## 核心原则
-
-                1. **只使用提供的参考资料回答**，不得编造任何资料中不存在的信息
-                2. **禁止使用常识或推理补全资料中未提供的信息**
-                3. **如果资料不足以完整回答，必须明确回答"根据现有资料无法回答该问题"**
-                4. **用中文回答**
-
-                ## 结构化输出要求
-
-                回答必须包含以下三部分，缺一不可：
-
-                ### 一、答案
-                基于资料给出答案，每条结论必须标注[编号]
-
-                ### 二、引用来源
-                所有引用的编号必须对应当前context中的chunk顺序
-
-                ### 三、无匹配说明（若无相关资料）
-                如果资料中没有相关信息，回答："根据现有资料无法回答该问题"
-
-                ## 严格引用规则
-
-                - 每个结论必须有对应chunk编号
-                - 不允许无引用的结论
-                - 若无法引用 → 删除该结论
-                - 禁止跨chunk混用引用
-
-                ## 参考资料
-
-                %s
-
-                ## 用户问题
-
-                %s
-
-                ## 回答格式
-
-                答案：
-                1. [结论内容] [编号]
-                2. [结论内容] [编号]
-
-                来源：[编号列表]
-
-                （如果无相关资料，直接输出：根據現有資料無法回答該問題）
-                """.formatted(context, question);
+        String template = promptLoader.load(promptProperties.getGrounding());
+        return promptLoader.fill(template, Map.of(
+            "question", question,
+            "prompt", context
+        ));
     }
 
     public void clear() {
@@ -349,13 +292,11 @@ public class RagService {
         try {
             int totalChunks = embeddingStore.size();
 
-            // Hybrid mode: if no documents, fallback to direct LLM answer
             if (totalChunks == 0) {
                 streamDirectAnswer(question, emitter);
                 return;
             }
 
-            // Retrieval phase
             List<String> queries = generateMultipleQueries(question);
             int topK = calculateDynamicTopK(totalChunks, 5);
 
@@ -378,10 +319,8 @@ public class RagService {
                 .map(InMemoryEmbeddingStore.ScoredChunk::getChunk)
                 .toList();
 
-            // Rerank
             List<EmbeddedChunk> rerankedChunks = rerankAndFilter(question, mergedChunks, topK);
 
-            // Build context and send metadata first
             StringBuilder context = new StringBuilder();
             List<CitationChunk> citationChunks = new ArrayList<>();
             int index = 1;
@@ -393,11 +332,9 @@ public class RagService {
                 index++;
             }
 
-            // Send metadata event with citation chunks
             String metadataJson = buildMetadataJson(citationChunks);
             emitter.send(SseEmitter.event().name("metadata").data(metadataJson));
 
-            // Build prompt and get answer
             String prompt = buildPrompt(question, context.toString());
             RagAssistant assistant = AiServices.builder(RagAssistant.class)
                     .chatLanguageModel(modelFactory.getDefaultModel())
@@ -405,7 +342,6 @@ public class RagService {
 
             String fullResponse = assistant.chat(prompt);
 
-            // Stream character by character
             for (char c : fullResponse.toCharArray()) {
                 emitter.send(SseEmitter.event().name("message").data(String.valueOf(c)));
                 Thread.sleep(20);
@@ -419,17 +355,14 @@ public class RagService {
     }
 
     private void streamDirectAnswer(String question, SseEmitter emitter) throws Exception {
-        // No metadata (empty citations)
         emitter.send(SseEmitter.event().name("metadata").data("[]"));
 
-        // Direct LLM answer without RAG
         RagAssistant assistant = AiServices.builder(RagAssistant.class)
                 .chatLanguageModel(modelFactory.getDefaultModel())
                 .build();
 
         String fullResponse = assistant.chat(question);
 
-        // Stream character by character
         for (char c : fullResponse.toCharArray()) {
             emitter.send(SseEmitter.event().name("message").data(String.valueOf(c)));
             Thread.sleep(20);

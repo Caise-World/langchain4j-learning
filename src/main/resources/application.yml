@@ -50,6 +50,12 @@ ai-models:
     temperature: 0.7
     max-tokens: 1024
 
+# Prompt Templates
+prompts:
+  grounding: classpath:prompts/grounding-prompt.txt
+  rerank: classpath:prompts/rerank-prompt.txt
+  multi-query: classpath:prompts/multi-query-prompt.txt
+
 ---
 # PgVector profile for production
 spring:
