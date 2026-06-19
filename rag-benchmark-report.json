@@ -1,0 +1,210 @@
+{
+  "timestamp" : "2026-05-25T14:50:07.141982Z",
+  "totalCases" : 20,
+  "passCount" : 8,
+  "failCount" : 0,
+  "hallucinationCount" : 0,
+  "noRetrievalCount" : 0,
+  "passRate" : "40.00%",
+  "results" : [ {
+    "question" : "Spring Boot 中 @Autowired 注解的注入方式有哪几种？它们的区别是什么？",
+    "expectedKeywords" : [ "构造器注入", "setter注入", "字段注入", "required" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 29,
+    "retrievalHitCount" : 0,
+    "answerLength" : 258,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "<think>用户问的是Spring Boot中@Autowired注解的注入方式有哪几种，以及它们的区别。\n\n但是用户提供的参考资料列表是空的：\n## 参考资料\n\n（这里没有提供任何chunk内容）\n\n根据系统提示：\n1. 只使用提供的参考资料回答\n2. 禁止使用常识或推理补全资料中未提供的信息\n3. 如果资料不足以完整回答，必须明确回答\"根据现有资料无法回答该问题\"\n\n由于参考资料为空，我无法根据现有资料回答这个问题。\n\n我应该输出：根據現有資料無法回答該問題\n</think>\n\n根據現有資料無法回答該問題"
+  }, {
+    "question" : "JPA 和 MyBatis 在事务管理上的核心区别是什么？",
+    "expectedKeywords" : [ "JPA", "MyBatis", "事务", "EntityManager", "SqlSession" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 27,
+    "retrievalHitCount" : 3,
+    "answerLength" : 305,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>\n用户询问关于JPA和MyBatis在事务管理上的核心区别。\n\n让我检查提供的参考资料：\n\n我看到的参考资料部分显示为空白，没有提供任何chunk数据或文档内容。\n\n根据系统指令：\n1. 只使用提供的参考资料回答\n2. 不得编造任何资料中不存在的信息\n3. 如果资料不足以完整回答，必须明确回答\"根据现有资料无法回答该问题\"\n\n由于参考资料为空，没有任何关于JPA和MyBatis事务管理区别的资料，我必须按照规则回答\"根據現有資料無法回答該問題\"（因为要求用中文回答）。\n\n我需要使用：\n- 答案部分说明无法回答\n- 来源部分留空或说明无匹配资料\n</think>\n\n根據現有資料無法回答該問題"
+  }, {
+    "question" : "Redis 的持久化机制有哪几种？AOF 和 RDB 的优缺点是什么？",
+    "expectedKeywords" : [ "RDB", "AOF", "持久化", "fork", "appendonly" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 25,
+    "retrievalHitCount" : 4,
+    "answerLength" : 1042,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>用户问的是Redis的持久化机制有哪几种，以及AOF和RDB的优缺点。\n\n让我分析提供的参考资料：\n\n1. Chunk [1] 讲的是RDB持久化，包括触发方式、工作原理、优缺点、配置示例\n2. Chunk [2] 主要讲Redis数据结构（String、List、Hash）\n3. Chunk [3] 讲AOF配置、RDB vs AOF对比、混合持久化\n\n从chunk [1]可以获取：\n- RDB的触发方式（自动触发、手动触发、shutdown）\n- RDB的工作原理（fork创建子进程等）\n- RDB的优点（恢复速度快、文件紧凑、适合大规模备份）\n- RDB的缺点（可能丢失数据、fork开销）\n\n从chunk [3]可以获取：\n- AOF的配置选项\n- RDB vs AOF对比表格\n- 混合持久化（提到5.0+，但没详细说）\n\n关于AOF的优缺点，chunk [3]的对比表格里有提到：\n- AOF文件较大（vs RDB紧凑）\n- AOF恢复速度慢（vs RDB快）\n- AOF丢失概率小（vs RDB可能丢失数据）\n- AOF持续写开销（vs RDB fork开销）\n\n但chunk [3]没有明确说AOF单独的优缺点，只在对比表格中体现。\n\n\n现在我需要整理答案。首先确认Redis有RDB、AOF和混合持久化三种机制。然后根据chunk [1]和[3]的内容，分别列出RDB的优点（恢复快、文件紧凑、适合备份）和缺点（可能丢数据、fork开销），以及AOF在对比表格中体现的特性优势。\n</think>\n\n答案：\n1. Redis 的持久化机制主要有两种：RDB（Redis Database）和 AOF（Append Only File），此外还有混合持久化机制（5.0+版本） [1][3]\n2. RDB 持久化的优点包括：恢复速度快、生成的文件紧凑、适合大规模数据备份 [1]\n3. RDB 持久化的缺点包括：可能丢失最后一次快照后的数据、fork 操作有内存 copy-on-write 开销 [1]\n4. AOF 持久化的优点包括：数据安全性更高、丢失概率小 [3]\n5. AOF 持久化的缺点包括：文件较大、恢复速度慢、持续写入有性能开销 [3]\n6. RDB 的特点：文件紧凑、恢复速度快、数据安全性可能丢失数据、有 fork 开销 [3]\n7. AOF 的特点：文件较大、恢复速度慢、丢失概率小、持续写开销 [3]\n\n来源：[1][3]"
+  }, {
+    "question" : "HashMap 在 JDK 1.8 中为什么引入红黑树？什么条件会触发树化？",
+    "expectedKeywords" : [ "红黑树", "HashMap", "树化", "链表", "扩容", "PUT" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 25,
+    "retrievalHitCount" : 4,
+    "answerLength" : 781,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>让我分析用户的问题和提供的参考资料。\n\n用户问题：HashMap 在 JDK 1.8 中为什么引入红黑树？什么条件会触发树化？\n\n我需要从提供的参考资料中找答案。\n\n查看参考资料：\n\n**Chunk 1:**\n- 提到\"引入红黑树（自平衡二叉查找树）\"\n- 提到\"查找复杂度稳定在 O(log n)\"\n\n**Chunk 2:**\n- 包含红黑树转换条件\n- TREEIFY_THRESHOLD = 8（链表长度 >= 8）\n- UNTREEIFY_THRESHOLD = 6（红黑树节点数 <= 6）\n- 包含触发流程\n\n**Chunk 3:**\n- 解释为什么引入红黑树\n- JDK 1.7 及之前使用链表的问题\n- 链表过长导致查找复杂度退化为 O(n)\n- JDK 1.8 引入红黑树的解决方案\n\n让我整理答案：\n\n1. **为什么引入红黑树：**\n   - JDK 1.7及之前使用链表解决hash冲突时，当hash冲突严重，链表过长\n   - 查找复杂度退化为 O(n)\n   - JDK 1.8引入红黑树（自平衡二叉查找树），查找复杂度稳定在 O(log n)\n\n2. **触发树化条件：**\n   - 链表长度 >= 8 时，链表转为红黑树\n   - 当节点数降到6或以下时，红黑树会重新转换回链表结构\n\n现在按照格式要求输出答案。\n</think>\n\n答案：\n1. JDK 1.7及之前使用链表解决hash冲突，当hash冲突严重时链表过长，查找复杂度退化为 O(n)，性能下降 [3]\n2. JDK 1.8引入红黑树（自平衡二叉查找树），将查找复杂度稳定在 O(log n) [3]\n3. 当链表长度达到 8（即 >= 8）时，链表会转为红黑树 [2]\n4. 当红黑树节点数 <= 6 时，会转回链表 [2]\n\n来源：[2][3]"
+  }, {
+    "question" : "RabbitMQ 的 Exchange 类型有哪些？它们分别适用于什么场景？",
+    "expectedKeywords" : [ "Exchange", "Direct", "Topic", "Fanout", "Headers" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 26,
+    "retrievalHitCount" : 1,
+    "answerLength" : 2293,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>The user is asking: \"RabbitMQ 的 Exchange 类型有哪些？它们分别适用于什么场景？\"\n\nThey have provided a set of system instructions: you are a knowledge base Q&A assistant based strictly on provided reference materials; you cannot make up information; must cite appropriate chunk numbers; must answer in Chinese; structure output with answer, sources, and if no relevant info then indicate cannot answer. There are no references provided in the prompt (the \"参考资料\" section is empty). So we have no reference material about RabbitMQ exchange types. According to instructions, we must either say \"根据现有资料无法回答该问题\" if there is no relevant info. But before concluding we need to check the instructions: The system says:\n\n\"## 参考资料\n\n（empty）\"\n\nThus there is no reference content. So we cannot answer, we must respond that we cannot answer based on existing data. However the system instruction explicitly says: \"如果资料中没有相关信息，回答：\"根据现有资料无法回答该问题\". So we must output that phrase.\n\nBut also note that they asked to output three parts: answer, sources, and no-match explanation. The answer section: we could say \"根据现有资料无法回答该问题\". Then sources: just a list, perhaps \"无\". Or we can say \"无\". Or we can omit the list. The guidelines: \"来源：[编号列表]\" If none, we can say \"无\". So we produce:\n\n答案：根据现有资料无法回答该问题\n\n来源：无\n\nProbably we need a third part \"无匹配说明\" maybe? But they've asked to include three parts: answer, source, and no-match. In this case the \"no-match\" is similar to answer being \"无法回答\". The format they've requested: \n\n答案：\n1. [结论内容] [编号]\n2. [结论内容] [编号]\n\n来源：[编号列表]\n\n（如果无相关资料，直接输出：根據現有資料無法回答該問題）\n\nSo we output:\n\n答案：根据现有资料无法回答该问题\n\n来源：无\n\nThat's it.\n\nGiven that the user asked about RabbitMQ exchange types, but we have no references, we must comply.\n\nOne might ask: The system says \"禁止使用常识或推理补全资料中未提供的信息\". So we can't answer based on our knowledge of RabbitMQ. So we must not provide answer.\n\nThus final answer: answer part with the inability to answer, and source \"无\". Possibly we can also output \"无匹配说明\". But they've given the final note: \"（如果无相关资料，直接输出：根據現有資料無法回答該問題）\". So we can just output that line. However they also ask for \"答案\", \"来源\", and \"无匹配说明\". Since we have none, maybe just answer with that phrase, and no source list.\n\nThus final response:\n\n答案：根据现有资料无法回答该问题\n\n来源：无\n\nWill satisfy.\n</think>\n\n\n\n答案：根据现有资料无法回答该问题  \n\n来源：无"
+  }, {
+    "question" : "Spring Cloud Gateway 是如何实现路由转发的？Filter 是怎么工作的？",
+    "expectedKeywords" : [ "Gateway", "Route", "Filter", "Predicate", "动态路由" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 27,
+    "retrievalHitCount" : 2,
+    "answerLength" : 335,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>\n用户询问Spring Cloud Gateway的路由转发实现原理以及Filter的工作机制。我需要检查提供的参考资料中是否有相关信息。\n\n但是，我注意到参考资料部分显示为空的：\n```\n## 参考资料\n（无任何文档内容）\n```\n\n这意味着没有任何关于Spring Cloud Gateway的技术文档被提供。根据我的指示：\n1. 只使用提供的参考资料回答\n2. 如果资料不足以完整回答，必须明确回答\"根据现有资料无法回答该问题\"\n\n由于参考资料为空，没有关于Spring Cloud Gateway的任何技术文档，我无法基于这些资料来回答用户的问题。\n\n我应该明确告知用户：根据现有资料无法回答该问题。\n</think>\n\n根據現有資料無法回答該問題"
+  }, {
+    "question" : "Zookeeper 的 Watch 机制是怎么实现的？为什么不能依赖 Watch 做强一致性？",
+    "expectedKeywords" : [ "Watch", "Zookeeper", "事件", "临时节点", "顺序节点" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 29,
+    "retrievalHitCount" : 2,
+    "answerLength" : 256,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>用户问的是关于 Zookeeper 的 Watch 机制的实现原理，以及为什么不能依赖 Watch 做强一致性。\n\n让我检查一下提供的参考资料中是否有相关内容：\n\n提供的参考资料显示为空的：\n```\n## 参考资料\n\n（空）\n```\n\n这意味着没有任何关于 Zookeeper 的资料被提供。按照规则，我只能基于提供的资料回答，如果没有相关资料，我必须回答\"根据现有资料无法回答该问题\"。\n\n根据现有资料无法回答该问题。\n\n我需要按照指定的格式输出。\n</think>\n\n根据现有资料无法回答该问题"
+  }, {
+    "question" : "在 LangChain4j 中 AiServices 是如何将 Java 接口方法转换为 LLM 调用的？",
+    "expectedKeywords" : [ "AiServices", "Tool", "MethodResolver", "chatLanguageModel" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : 25,
+    "retrievalHitCount" : 1,
+    "answerLength" : 364,
+    "answerContainsExpectedKeywords" : true,
+    "hallucination" : false,
+    "answer" : "<think>用户问的是在 LangChain4j 中 AiServices 如何将 Java 接口方法转换为 LLM 调用的。这是一个关于 LangChain4j 库内部机制的问题。\n\n让我看看提供的参考文档：\n\n参考文档只有一个标题 \"LangChain4j 关键组件解析\"，但内容是空的（\"// No content available\"）。\n\n由于没有提供任何实际的参考资料，我无法从文档中找到关于 AiServices 如何工作的信息。\n\n根据系统提示的原则：\n1. 只使用提供的参考资料回答\n2. 禁止使用常识或推理补全资料中未提供的信息\n3. 如果资料不足以完整回答，必须明确回答\"根据现有资料无法回答该问题\"\n\n因此，我应该回答\"根據現有資料無法回答該問題\"。\n</think>\n\n\n\n根據現有資料無法回答該問題"
+  }, {
+    "question" : "Java 并发编程中，CyclicBarrier 和 CountDownLatch 的核心区别是什么？",
+    "expectedKeywords" : [ "CyclicBarrier", "CountDownLatch", "屏障", "计数器", "可重用" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"usage limit exceeded, 5-hour usage limit reached for Token Plan Starter (600/600 used), resets at 2026-05-26T00:00:00+08:00 (2056)\",\"http_code\":\"429\"},\"request_id\":\"0663948bd0276d9757a9b31d9f96e50e\"}\n"
+  }, {
+    "question" : "Seata 的 AT 模式是如何解决分布式事务的？全局锁是怎么管理的？",
+    "expectedKeywords" : [ "Seata", "AT模式", "全局事务", "分支事务", "undo_log" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"usage limit exceeded, 5-hour usage limit reached for Token Plan Starter (600/600 used), resets at 2026-05-26T00:00:00+08:00 (2056)\",\"http_code\":\"429\"},\"request_id\":\"0663948d07a8c29a1c447fd8f2256e00\"}\n"
+  }, {
+    "question" : "如何用 Spring Boot + Redis 实现一个简单的分布式锁？",
+    "expectedKeywords" : [ "分布式锁", "SETNX", "Redisson", "过期时间", "可重入" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"usage limit exceeded, 5-hour usage limit reached for Token Plan Starter (600/600 used), resets at 2026-05-26T00:00:00+08:00 (2056)\",\"http_code\":\"429\"},\"request_id\":\"0663948f365d7657915a652590773931\"}\n"
+  }, {
+    "question" : "Kafka 的消费者组 Rebalance 触发的条件是什么？如何避免 Rebalance 风暴？",
+    "expectedKeywords" : [ "Rebalance", "Kafka", "消费者组", "session.timeout", "heartbeat" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"usage limit exceeded, 5-hour usage limit reached for Token Plan Starter (600/600 used), resets at 2026-05-26T00:00:00+08:00 (2056)\",\"http_code\":\"429\"},\"request_id\":\"06639491ba8a82013a4f95fab974cf6a\"}\n"
+  }, {
+    "question" : "基于 LangChain4j 的 RAG 应用中，Embedding 模型和 rerank 模型有什么区别？",
+    "expectedKeywords" : [ "Embedding", "rerank", "向量化", "相似度", "rerank模型" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"usage limit exceeded, 5-hour usage limit reached for Token Plan Starter (600/600 used), resets at 2026-05-26T00:00:00+08:00 (2056)\",\"http_code\":\"429\"},\"request_id\":\"06639493e1c5e43cce80008061f19920\"}\n"
+  }, {
+    "question" : "Elasticsearch 的倒排索引是如何构建的？为什么适合全文搜索？",
+    "expectedKeywords" : [ "倒排索引", "Elasticsearch", "分词", "Inverted Index", "TF-IDF" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"06639494332931df9c4cd95cd64fa963\"}\n"
+  }, {
+    "question" : "Nacos 的服务发现原理是什么？CP 和 AP 模式是如何切换的？",
+    "expectedKeywords" : [ "Nacos", "服务发现", "CP", "AP", "Distro", "Raft" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"066394961bdd6b717fd2bbb106b3d265\"}\n"
+  }, {
+    "question" : "MySQL 的 MVCC 是如何实现的？Read View 在 RC 和 RR 隔离级别下有什么区别？",
+    "expectedKeywords" : [ "MVCC", "ReadView", "undo log", "版本链", "RC", "RR" ],
+    "expectReject" : false,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"0663949895dba75f945d721942bdcebf\"}\n"
+  }, {
+    "question" : "一个从未见过的完全无关问题：量子计算如何改变 RSA 加密算法？",
+    "expectedKeywords" : [ ],
+    "expectReject" : true,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"06639499ff443d5055cd3773c68856a1\"}\n"
+  }, {
+    "question" : "关于 Python 机器学习的问题：scikit-learn 中随机森林的 max_depth 参数如何调优？",
+    "expectedKeywords" : [ ],
+    "expectReject" : true,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"0663949bd9ce28312e2e4ebdc6b8300a\"}\n"
+  }, {
+    "question" : "完全无关领域问题：如何用 Photoshop 设计一个高保真网站原型？",
+    "expectedKeywords" : [ ],
+    "expectReject" : true,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"0663949d1bc9cadaf049bc4963bb1f3f\"}\n"
+  }, {
+    "question" : "一个故意设计为无答案但语义相关的问题：Redis 的作者是谁？",
+    "expectedKeywords" : [ "Redis", "作者", "Salvatore", "Sanfilippo" ],
+    "expectReject" : true,
+    "retrievalChunkCount" : -1,
+    "retrievalHitCount" : -1,
+    "answerLength" : -1,
+    "answerContainsExpectedKeywords" : false,
+    "hallucination" : false,
+    "answer" : "ERROR: dev.ai4j.openai4j.OpenAiHttpException: {\"type\":\"error\",\"error\":{\"type\":\"rate_limit_error\",\"message\":\"Token Plan 主要面向个人开发者的交互式使用场景。当前请求量较高，请稍后重试；如需支持更高并发或自动化任务，建议升级至更高级别套餐，或使用按量付费 API。 (2062)\",\"http_code\":\"429\"},\"request_id\":\"0663949fa019b5c9e89d160f08c07378\"}\n"
+  } ]
+}
