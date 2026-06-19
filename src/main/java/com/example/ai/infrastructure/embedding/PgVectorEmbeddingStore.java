@@ -1,22 +1,36 @@
 package com.example.ai.infrastructure.embedding;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.langchain4j.data.embedding.Embedding;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.sql.Array;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class PgVectorEmbeddingStore implements EmbeddingStore {
 
     private final EntityManager em;
-    private static final int DIMENSION = 1536;
+    private static final int DIMENSION = 768; // nomic-embed-text uses 768 dimensions
+    private static final String MODEL = "nomic-embed-text";
+    private final OkHttpClient client = new OkHttpClient();
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String ollamaUrl;
 
-    public PgVectorEmbeddingStore(EntityManager em) {
+    public PgVectorEmbeddingStore(EntityManager em, @Value("${ollama.host:http://localhost:11434}") String ollamaHost) {
         this.em = em;
+        this.ollamaUrl = ollamaHost + "/api/embeddings";
         initTable();
     }
 
@@ -55,54 +69,98 @@ public class PgVectorEmbeddingStore implements EmbeddingStore {
 
     @Override
     public List<EmbeddedChunk> findRelevant(String text, int topK) {
-        Embedding queryEmbedding = createEmbedding(text);
-        float[] queryVector = queryEmbedding.vector();
+        return findRelevant(text, topK, 0.6);
+    }
 
-        Query query = em.createNativeQuery(
-                "SELECT id, embedding::text, text FROM embeddings ORDER BY embedding <=> ?::vector LIMIT ?"
-        );
-        try {
-            query.setParameter(1, vectorToSqlArray(queryVector));
-        } catch (SQLException e) {
-            throw new RuntimeException("Failed to create query vector", e);
-        }
-        query.setParameter(2, topK);
-
-        @SuppressWarnings("unchecked")
-        List<Object[]> rows = query.getResultList();
-
-        List<EmbeddedChunk> chunks = new ArrayList<>();
-        for (Object[] row : rows) {
-            String id = (String) row[0];
-            String embeddingText = (String) row[1];
-            String content = (String) row[2];
-
-            float[] floatVector = parseVector(embeddingText);
-            chunks.add(new EmbeddedChunk(
-                    id,
-                    new Embedding(floatVector),
-                    dev.langchain4j.data.segment.TextSegment.from(content)
-            ));
-        }
-
-        return chunks;
+    public List<EmbeddedChunk> findRelevant(String text, int topK, double threshold) {
+        return findRelevantWithScores(text, topK).stream()
+                .filter(sc -> sc.getScore() >= threshold)
+                .map(InMemoryEmbeddingStore.ScoredChunk::getChunk)
+                .toList();
     }
 
     @Override
     public List<InMemoryEmbeddingStore.ScoredChunk> findRelevantWithScores(String text, int topK) {
-        throw new UnsupportedOperationException("PgVector does not expose per-chunk similarity scores");
+        Embedding queryEmbedding = createEmbedding(text);
+        return findRelevantChunksWithScores(queryEmbedding, topK, 0.0);
+    }
+
+    public List<InMemoryEmbeddingStore.ScoredChunk> findRelevantChunksWithScores(Embedding queryEmbedding, int maxResults, double threshold) {
+        float[] queryVector = queryEmbedding.vector();
+
+        // PgVector <=> operator returns cosine distance (0 = identical, 2 = opposite)
+        // Convert to similarity score: score = 1 - distance
+        Query query = em.createNativeQuery(
+                "SELECT id, embedding::text, text, (1 - (embedding <=> ?::vector)) as similarity FROM embeddings ORDER BY embedding <=> ?::vector LIMIT ?"
+        );
+        try {
+            query.setParameter(1, vectorToSqlArray(queryVector));
+            query.setParameter(2, vectorToSqlArray(queryVector));
+        } catch (SQLException e) {
+            throw new RuntimeException("Failed to create query vector", e);
+        }
+        query.setParameter(3, maxResults);
+
+        @SuppressWarnings("unchecked")
+        List<Object[]> rows = query.getResultList();
+
+        List<InMemoryEmbeddingStore.ScoredChunk> results = new ArrayList<>();
+        for (Object[] row : rows) {
+            String id = (String) row[0];
+            String embeddingText = (String) row[1];
+            String content = (String) row[2];
+            Double similarity = ((Number) row[3]).doubleValue();
+
+            float[] floatVector = parseVector(embeddingText);
+            EmbeddedChunk chunk = new EmbeddedChunk(
+                    id,
+                    new Embedding(floatVector),
+                    dev.langchain4j.data.segment.TextSegment.from(content)
+            );
+            results.add(new InMemoryEmbeddingStore.ScoredChunk(chunk, similarity));
+        }
+
+        return results;
+    }
+
+    public List<EmbeddedChunk> findRelevantChunks(Embedding queryEmbedding, int maxResults, double threshold) {
+        return findRelevantChunksWithScores(queryEmbedding, maxResults, threshold).stream()
+                .filter(sc -> sc.getScore() >= threshold)
+                .map(InMemoryEmbeddingStore.ScoredChunk::getChunk)
+                .toList();
     }
 
     @Override
     public Embedding createEmbedding(String text) {
-        float[] vector = new float[DIMENSION];
-        for (int i = 0; i < text.length() && i < DIMENSION; i++) {
-            vector[i] = (float) text.charAt(i) / 255.0f;
+        try {
+            Map<String, String> requestBody = Map.of("model", MODEL, "prompt", text);
+            String json = objectMapper.writeValueAsString(requestBody);
+            RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
+            Request request = new Request.Builder()
+                    .url(ollamaUrl)
+                    .post(body)
+                    .build();
+            try (Response response = client.newCall(request).execute()) {
+                if (!response.isSuccessful()) {
+                    throw new RuntimeException("Ollama API error: " + response.code() + " - " + response.body().string());
+                }
+                String responseBody = response.body().string();
+                JsonNode root = objectMapper.readTree(responseBody);
+                JsonNode embeddingNode = root.get("embedding");
+                if (embeddingNode == null) {
+                    throw new RuntimeException("No 'embedding' in Ollama response: " + responseBody);
+                }
+                float[] result = new float[embeddingNode.size()];
+                for (int i = 0; i < result.length; i++) {
+                    result[i] = (float) embeddingNode.get(i).asDouble();
+                }
+                return new Embedding(result);
+            }
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch embedding from Ollama", e);
         }
-        for (int i = text.length(); i < DIMENSION; i++) {
-            vector[i] = 0.1f;
-        }
-        return new Embedding(vector);
     }
 
     @Override

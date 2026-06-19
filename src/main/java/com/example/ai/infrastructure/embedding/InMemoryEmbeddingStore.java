@@ -17,13 +17,21 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class InMemoryEmbeddingStore implements EmbeddingStore {
 
-    private static final String OLLAMA_URL = "http://localhost:11434/api/embeddings";
     private static final String MODEL = "nomic-embed-text";
     private final OkHttpClient client = new OkHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final String ollamaUrl;
 
     private final List<EmbeddedChunk> chunks = new ArrayList<>();
     private final Map<String, float[]> cache = new ConcurrentHashMap<>();
+
+    public InMemoryEmbeddingStore() {
+        this("http://localhost:11434");
+    }
+
+    public InMemoryEmbeddingStore(String ollamaHost) {
+        this.ollamaUrl = ollamaHost + "/api/embeddings";
+    }
 
     @Override
     public String add(Embedding embedding, String text) {
@@ -68,7 +76,7 @@ public class InMemoryEmbeddingStore implements EmbeddingStore {
             String json = objectMapper.writeValueAsString(requestBody);
             RequestBody body = RequestBody.create(json, MediaType.parse("application/json"));
             Request request = new Request.Builder()
-                    .url(OLLAMA_URL)
+                    .url(ollamaUrl)
                     .post(body)
                     .build();
             try (Response response = client.newCall(request).execute()) {

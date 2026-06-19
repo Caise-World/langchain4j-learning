@@ -28,13 +28,13 @@ public class MultiModelConfig {
     private String activeProfile;
 
     @Bean
-    public EmbeddingStore embeddingStore(EntityManager em) {
+    public EmbeddingStore embeddingStore(EntityManager em, @Value("${ollama.host:http://localhost:11434}") String ollamaHost) {
         if ("pgvector".equals(activeProfile)) {
-            log.info("Using PgVectorEmbeddingStore");
-            return new PgVectorEmbeddingStore(em);
+            log.info("Using PgVectorEmbeddingStore with Ollama at {}", ollamaHost);
+            return new PgVectorEmbeddingStore(em, ollamaHost);
         }
-        log.info("Using InMemoryEmbeddingStore");
-        return new InMemoryEmbeddingStore();
+        log.info("Using InMemoryEmbeddingStore with Ollama at {}", ollamaHost);
+        return new InMemoryEmbeddingStore(ollamaHost);
     }
 
     @Bean

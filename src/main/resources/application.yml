@@ -25,6 +25,10 @@ spring:
 server:
   port: 8081
 
+# Ollama configuration
+ollama:
+  host: ${OLLAMA_HOST:http://localhost:11434}
+
 logging:
   level:
     com.example.ai: DEBUG

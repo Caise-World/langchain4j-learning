@@ -164,13 +164,25 @@ sequenceDiagram
 
 ## Screenshots
 
-> 如果截图不存在，仅保留占位区域
+> 截图待补充。部署后访问 http://localhost 截取以下页面，保存到 `docs/screenshots/` 目录
 
-### Chat Page
+### Chat 页面
+<!-- 截图路径: docs/screenshots/chat.png -->
+<!-- 截取内容: 对话界面，展示 SSE 流式输出、Markdown 渲染效果 -->
+
 ![Chat](./docs/screenshots/chat.png)
 
-### Knowledge Base Upload
+### 知识库上传页面
+<!-- 截图路径: docs/screenshots/knowledge.png -->
+<!-- 截取内容: 文档上传界面，支持 TXT/PDF/DOCX 格式 -->
+
 ![Knowledge](./docs/screenshots/knowledge.png)
+
+### RAG 引用来源展示
+<!-- 截图路径: docs/screenshots/citation.png -->
+<!-- 截取内容: RAG 问答结果，展示引用高亮、来源标注、可点击溯源 -->
+
+![Citation](./docs/screenshots/citation.png)
 
 ## Benchmark
 
@@ -227,8 +239,8 @@ src/main/java/com/example/ai/
 
 ## 后续规划
 
-- [x] **Docker Compose 一键部署** — PostgreSQL + PgVector + Ollama + Spring Boot ✅ 已实现
-- [ ] **PgVector 生产级向量存储** — 百万级文档支持
+- [x] **Docker Compose 一键部署** — MySQL + Ollama + Spring Boot + Vue3 ✅ 已实现
+- [ ] **PgVector 生产级向量存储** — Docker 中添加 PostgreSQL + pgvector，支持百万级文档
 - [ ] **会话持久化数据库版** — MySQL 存储聊天历史，支持多设备同步
 - [ ] **Tool Calling** — LLM 调用外部工具（查天气、搜百科、数据库查询）
 - [ ] **Agent Workflow** — 多 Agent 协作（规划 Agent + 执行 Agent + 审核 Agent）
