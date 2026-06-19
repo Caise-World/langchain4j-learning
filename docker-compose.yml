@@ -1,0 +1,55 @@
+services:
+  mysql:
+    image: mysql:8
+    container_name: rag-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=ai_service
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - rag-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    container_name: rag-backend
+    ports:
+      - "8081:8081"
+    environment:
+      - MINIMAX_API_KEY=${MINIMAX_API_KEY}
+      - OLLAMA_HOST=http://host.docker.internal:11434
+      - DB_PASSWORD=root
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ai_service?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - rag-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    container_name: rag-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - rag-network
+
+networks:
+  rag-network:
+    driver: bridge
+
+volumes:
+  mysql-data:

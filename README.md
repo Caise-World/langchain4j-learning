@@ -227,7 +227,7 @@ src/main/java/com/example/ai/
 
 ## 后续规划
 
-- [ ] **Docker Compose 一键部署** — PostgreSQL + PgVector + Ollama + Spring Boot
+- [x] **Docker Compose 一键部署** — PostgreSQL + PgVector + Ollama + Spring Boot ✅ 已实现
 - [ ] **PgVector 生产级向量存储** — 百万级文档支持
 - [ ] **会话持久化数据库版** — MySQL 存储聊天历史，支持多设备同步
 - [ ] **Tool Calling** — LLM 调用外部工具（查天气、搜百科、数据库查询）
@@ -304,6 +304,48 @@ curl -X POST http://localhost:8081/api/rag/upload \
 curl -X POST http://localhost:8081/api/rag/query \
   -H "Content-Type: application/json" \
   -d '{"question": "你的问题", "topK": 3}'
+```
+
+## Docker 启动
+
+### 前置环境
+
+- Docker & Docker Compose
+
+### 快速启动
+
+```bash
+# 设置环境变量
+export MINIMAX_API_KEY=your-key
+
+# 一键启动所有服务
+docker compose up --build
+```
+
+启动后访问：
+- 前端：http://localhost
+- 后端：http://localhost:8081
+- Ollama API：http://localhost:11434
+
+### 模型拉取（首次启动）
+
+容器启动后，需要手动拉取模型：
+
+```bash
+docker exec rag-ollama ollama pull nomic-embed-text
+docker exec rag-ollama ollama pull minimax/xxx  # 你的 LLM 模型
+```
+
+### 停止服务
+
+```bash
+docker compose down
+```
+
+### 查看日志
+
+```bash
+docker compose logs -f
 ```
 
 ## 开发说明
