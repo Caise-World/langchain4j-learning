@@ -1,4 +1,14 @@
 services:
+  ollama:
+    image: ollama/ollama
+    container_name: rag-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - rag-network
+
   mysql:
     image: mysql:8
     container_name: rag-mysql
@@ -26,7 +36,7 @@ services:
       - "8081:8081"
     environment:
       - MINIMAX_API_KEY=${MINIMAX_API_KEY}
-      - OLLAMA_HOST=http://host.docker.internal:11434
+      - OLLAMA_HOST=http://ollama:11434
       - DB_PASSWORD=root
       - SPRING_DATASOURCE_URL=jdbc:mysql://mysql:3306/ai_service?useSSL=false&serverTimezone=UTC&createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true
     depends_on:
@@ -53,3 +63,4 @@ networks:
 
 volumes:
   mysql-data:
+  ollama-data:
